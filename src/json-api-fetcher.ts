@@ -14,6 +14,7 @@ export interface FetchOptions {
   page?: PageOption
   include?: string[]
   filter?: string
+  signal?: AbortSignal
 }
 
 export interface FetchParams {
@@ -45,15 +46,17 @@ interface Options {
   searchParams: URLSearchParams
   headers: Headers
   method?: string
+  signal?: AbortSignal
 }
 
 async function req(url: string, options: Options) {
-  const { headers, searchParams, method } = options
+  const { headers, searchParams, method, signal } = options
   const textSearchParams = `?${searchParams}`
   const finalUrl = url.replace(/(?:\?.*?)?(?=#|$)/, textSearchParams)
   const response = await fetch(finalUrl, {
     method,
     headers,
+    signal,
   })
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
   const data = (await response.json()) as JsonApiDocument
