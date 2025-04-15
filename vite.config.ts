@@ -18,14 +18,10 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
-    minify: true,
     lib: {
       entry: resolve(__dirname, 'src/lib.ts'),
       formats: ['es'],
       fileName: 'lib',
-    },
-    rollupOptions: {
-      external: ['ky'],
     },
   },
 })

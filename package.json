@@ -25,9 +25,6 @@
     "type-check": "vue-tsc --build",
     "typedoc": "typedoc"
   },
-  "dependencies": {
-    "ky": "^1.7.5"
-  },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@tsconfig/node22": "^22.0.1",

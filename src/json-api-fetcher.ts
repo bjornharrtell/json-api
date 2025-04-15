@@ -1,4 +1,3 @@
-import ky, { type Options } from 'ky'
 import type { JsonApiDocument, JsonApiResource } from './json-api'
 
 function resolvePath(...segments: string[]): string {
@@ -42,6 +41,25 @@ export interface JsonApiFetcher {
   post(data: JsonApiResource): Promise<JsonApiDocument>
 }
 
+interface Options {
+  searchParams: URLSearchParams
+  headers: Headers
+  method?: string
+}
+
+async function req(url: string, options: Options) {
+  const { headers, searchParams, method } = options
+  const textSearchParams = `?${searchParams}`
+  const finalUrl = url.replace(/(?:\?.*?)?(?=#|$)/, textSearchParams)
+  const response = await fetch(finalUrl, {
+    method,
+    headers,
+  })
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
+  const data = (await response.json()) as JsonApiDocument
+  return data
+}
+
 export class JsonApiFetcherImpl implements JsonApiFetcher {
   constructor(private endpoint: string) {}
   createOptions(options: FetchOptions = {}, params: FetchParams = {}, post = false): Options {
@@ -64,39 +82,38 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const segments = [this.endpoint, type]
     if (id) segments.push(id)
     const url = resolvePath(...segments)
-    const doc = await ky.get(url, this.createOptions(options, params)).json<JsonApiDocument>()
+    const doc = await req(url, this.createOptions(options, params))
     return doc
   }
   async fetchAll(type: string, options?: FetchOptions, params?: FetchParams) {
     const url = resolvePath(this.endpoint, type)
-    const doc = await ky.get(url, this.createOptions(options, params)).json<JsonApiDocument>()
+    const doc = await req(url, this.createOptions(options, params))
     const resources = doc.data as JsonApiResource[]
     return resources
   }
   async fetchOne(type: string, id: string, options?: FetchOptions, params?: FetchParams) {
     const url = resolvePath(this.endpoint, type, id)
-    const doc = await ky.get(url, this.createOptions(options, params)).json<JsonApiDocument>()
+    const doc = await req(url, this.createOptions(options, params))
     const resource = doc.data as JsonApiResource
     return resource
   }
   async fetchHasMany(type: string, id: string, name: string, options?: FetchOptions, params?: FetchParams) {
     const url = resolvePath(this.endpoint, type, id, name)
-    const doc = await ky.get(url, this.createOptions(options, params)).json<JsonApiDocument>()
+    const doc = await req(url, this.createOptions(options, params))
     return doc
   }
   async fetchBelongsTo(type: string, id: string, name: string, options?: FetchOptions, params?: FetchParams) {
     const url = resolvePath(this.endpoint, type, id, name)
-    const doc = await ky.get(url, this.createOptions(options, params)).json<JsonApiDocument>()
+    const doc = await req(url, this.createOptions(options, params))
     return doc
   }
   async post(resource: JsonApiResource) {
     const url = resolvePath(this.endpoint, resource.type)
-    const requestOptions = this.createOptions({}, {}, true)
+    const options = this.createOptions({}, {}, true)
     const body: JsonApiDocument = {
       data: resource,
     }
-    requestOptions.json = body
-    const doc = await ky.post(url, requestOptions).json<JsonApiDocument>()
+    const doc = await req(url, options)
     return doc
   }
 }
