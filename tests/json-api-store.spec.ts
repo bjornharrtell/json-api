@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { Article, Person, articlesStore } from '../src/stores/articles'
+import { Article, Person, articlesStore } from '../src/stores/articles.js'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {

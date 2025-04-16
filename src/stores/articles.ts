@@ -1,6 +1,6 @@
-import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api'
-import type { JsonApiFetcher } from '../json-api-fetcher'
-import { Model, type ModelDefinition, RelationshipType, createJsonApiStore } from '../json-api-store'
+import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.js'
+import type { JsonApiFetcher } from '../json-api-fetcher.js'
+import { Model, type ModelDefinition, RelationshipType, createJsonApiStore } from '../json-api-store.js'
 import doc from './articles.json'
 
 export class JsonApiFetcherArticles implements JsonApiFetcher {

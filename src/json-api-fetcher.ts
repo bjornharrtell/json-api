@@ -1,4 +1,4 @@
-import type { JsonApiDocument, JsonApiResource } from './json-api'
+import type { JsonApiDocument, JsonApiResource } from './json-api.js'
 
 function resolvePath(...segments: string[]): string {
   return new URL(segments.join('/')).href

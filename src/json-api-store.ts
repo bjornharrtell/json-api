@@ -1,6 +1,6 @@
-import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from './json-api'
-import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetcherImpl } from './json-api-fetcher'
-import { camel } from './util'
+import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from './json-api.js'
+import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetcherImpl } from './json-api-fetcher.js'
+import { camel } from './util.js'
 
 /**
  * Base class for models
