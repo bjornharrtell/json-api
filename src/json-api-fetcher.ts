@@ -14,6 +14,7 @@ export interface FetchOptions {
   page?: PageOption
   include?: string[]
   filter?: string
+  headers?: HeadersInit
   signal?: AbortSignal
 }
 
@@ -67,10 +68,9 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
   constructor(private endpoint: string) {}
   createOptions(options: FetchOptions = {}, params: FetchParams = {}, post = false): Options {
     const searchParams = new URLSearchParams()
-    const headers = new Headers()
+    const headers = new Headers(options.headers)
     headers.append('Accept', 'application/vnd.api+json')
     if (post) headers.append('Content-Type', 'application/vnd.api+json')
-    //if (this.state) headers.append('Authorization', `Bearer ${this.state.value.token}`)
     const requestOptions = { searchParams, headers }
     if (options.fields)
       for (const [key, value] of Object.entries(options.fields)) searchParams.append(`fields[${key}]`, value.join(','))
