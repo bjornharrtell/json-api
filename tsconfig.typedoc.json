@@ -1,9 +1,0 @@
-{
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/main.ts", "src/stores/**", "src/components/**"],
-  "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "target": "ES2022"
-  }
-}

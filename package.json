@@ -22,18 +22,16 @@
     "test": "vitest",
     "build": "vite build",
     "preview": "vite preview",
-    "type-check": "vue-tsc --build",
+    "type-check": "tsc --noEmit",
     "typedoc": "typedoc"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@tsconfig/node22": "^22.0.1",
-    "@types/jsdom": "^21.1.7",
-    "@types/node": "^22.15.2",
-    "typedoc": "^0.28.3",
+    "@types/node": "^22.15.21",
+    "typedoc": "^0.28.4",
     "typescript": "~5.8.3",
-    "vite": "^6.3.3",
-    "vite-plugin-dts": "^4.5.3",
-    "vitest": "^3.1.2"
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^3.1.4"
   }
 }
