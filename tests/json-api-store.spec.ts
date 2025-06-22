@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, test } from 'vitest'
-import { Article, Person, articlesStore } from '../src/stores/articles.js'
+import { describe, expect, test } from 'vitest'
+import { Article, articlesJsonApi } from '../src/stores/articles.js'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
-    const article = await articlesStore.findRecord(Article, '1', {
+    const article = await articlesJsonApi.findRecord(Article, '1', {
       include: ['comments', 'author'],
     })
     expect(article.id).toBe('1')
@@ -16,7 +16,7 @@ describe('JsonApiStore', () => {
   })
 
   test('all records fetch', async () => {
-    const { records: articles } = await articlesStore.findAll(Article, {
+    const { records: articles } = await articlesJsonApi.findAll(Article, {
       include: ['comments', 'author'],
     })
     expect(articles.length).toBe(1)

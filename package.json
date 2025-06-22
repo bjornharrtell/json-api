@@ -26,12 +26,12 @@
     "typedoc": "typedoc"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
-    "@types/node": "^22.15.21",
-    "typedoc": "^0.28.4",
+    "@biomejs/biome": "2.0.4",
+    "@types/node": "^24.0.3",
+    "typedoc": "^0.28.5",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.4",
-    "vitest": "^3.1.4"
+    "vitest": "^3.2.4"
   }
 }

@@ -1,6 +1,6 @@
 import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.js'
+import { Model, type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.js'
 import type { JsonApiFetcher } from '../json-api-fetcher.js'
-import { Model, type ModelDefinition, RelationshipType, createJsonApiStore } from '../json-api-store.js'
 import doc from './articles.json'
 
 export class JsonApiFetcherArticles implements JsonApiFetcher {
@@ -60,7 +60,7 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
     const related = findIncluded(rid)
     return { data: related } as JsonApiDocument
   }
-  async post(data: JsonApiResource): Promise<JsonApiDocument> {
+  async post(_data: JsonApiResource): Promise<JsonApiDocument> {
     throw new Error('Not implemented')
   }
 }
@@ -104,8 +104,7 @@ const modelDefinitions: ModelDefinition[] = [
   },
 ]
 
-export const articlesStore = createJsonApiStore(
-  'articles',
+export const articlesJsonApi = useJsonApi(
   { endpoint: 'http://localhost:3000', modelDefinitions },
-  new JsonApiFetcherArticles()
+  new JsonApiFetcherArticles(),
 )

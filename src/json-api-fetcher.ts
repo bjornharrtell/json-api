@@ -31,14 +31,14 @@ export interface JsonApiFetcher {
     id: string,
     name: string,
     options?: FetchOptions,
-    params?: FetchParams
+    params?: FetchParams,
   ): Promise<JsonApiDocument>
   fetchBelongsTo(
     type: string,
     id: string,
     name: string,
     options?: FetchOptions,
-    params?: FetchParams
+    params?: FetchParams,
   ): Promise<JsonApiDocument>
   post(data: JsonApiResource): Promise<JsonApiDocument>
 }
@@ -47,17 +47,19 @@ interface Options {
   searchParams: URLSearchParams
   headers: Headers
   method?: string
+  body?: BodyInit
   signal?: AbortSignal
 }
 
 async function req(url: string, options: Options) {
-  const { headers, searchParams, method, signal } = options
+  const { headers, searchParams, method, signal, body } = options
   const textSearchParams = `?${searchParams}`
   const finalUrl = url.replace(/(?:\?.*?)?(?=#|$)/, textSearchParams)
   const response = await fetch(finalUrl, {
     method,
     headers,
     signal,
+    body,
   })
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
   const data = (await response.json()) as JsonApiDocument
@@ -66,12 +68,12 @@ async function req(url: string, options: Options) {
 
 export class JsonApiFetcherImpl implements JsonApiFetcher {
   constructor(private endpoint: string) {}
-  createOptions(options: FetchOptions = {}, params: FetchParams = {}, post = false): Options {
+  createOptions(options: FetchOptions = {}, params: FetchParams = {}, post = false, body?: BodyInit): Options {
     const searchParams = new URLSearchParams()
     const headers = new Headers(options.headers)
     headers.append('Accept', 'application/vnd.api+json')
     if (post) headers.append('Content-Type', 'application/vnd.api+json')
-    const requestOptions = { searchParams, headers }
+    const requestOptions = { searchParams, headers, body }
     if (options.fields)
       for (const [key, value] of Object.entries(options.fields)) searchParams.append(`fields[${key}]`, value.join(','))
     if (options.page?.size) searchParams.append('page[size]', options.page.size.toString())
@@ -112,10 +114,11 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
   }
   async post(resource: JsonApiResource) {
     const url = resolvePath(this.endpoint, resource.type)
-    const options = this.createOptions({}, {}, true)
-    const body: JsonApiDocument = {
+    const postDoc: JsonApiDocument = {
       data: resource,
     }
+    const body = JSON.stringify(postDoc)
+    const options = this.createOptions({}, {}, true, body)
     const doc = await req(url, options)
     return doc
   }
