@@ -2,14 +2,14 @@
 
 json-api can fetch typed data models via an JSON:API endpoint into record instances.
 
-A JsonApiStore is created with an endpoint and model definitions and the store instance API provides methods `findAll`, `findRecord` to fetch record(s). JsonApiStore will automatically resolve included relationships. If relationships for a record are not included they can be fetched later using `findRelated`.
+An instance is created with an endpoint and model definitions and the instance API provides methods `findAll`, `findRecord` to fetch record(s). Included relationships will be automatically resolved. If relationships for a record are not included they can be fetched later using `findRelated`.
 
 ## Example usage
 
-A service returning the canonical example JSON:API document at https://jsonapi.org/ can be consumed by a store defined in this way:
+A service returning the canonical example JSON:API document at https://jsonapi.org/ can be consumed this way:
 
 ```ts
-import { createJsonApiStore, Model, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
+import { useJsonApi, Model, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
 
 export class Person extends Model {
   firstName?: string
@@ -46,17 +46,17 @@ const modelDefinitions: ModelDefinition[] = [
   },
 ]
 
-export const articlesStore = createJsonApiStore('articles', {
+export const aticlesApi = useJsonApi({
   endpoint: 'http://localhost/api',
   modelDefinitions,
 })
 ```
 
-The above store can then be used as follows:
+The above can then be used as follows:
 
 ```ts
-import aticlesStore from './stores/articles'
-const { records: articles } = await aticlesStore.findAll(Article, { include: ['comments', 'author'] })
+import aticlesApi from './api/articles'
+const { records: articles } = await aticlesApi.findAll(Article, { include: ['comments', 'author'] })
 expect(articles.length).toBe(1)
 const article = articles[0]
 expect(article.id).toBe('1')
