@@ -13,7 +13,7 @@ export type {
   JsonApiUseFunction as JsonApiStoreUseFunction,
   ModelDefinition,
   Relationship,
-} from './json-api.js'
-export { Model, RelationshipType, useJsonApi } from './json-api.js'
-export type { FetchOptions, FetchParams, JsonApiFetcher, PageOption } from './json-api-fetcher.js'
-export { camel } from './util.js'
+} from './json-api.ts'
+export { Model, RelationshipType, useJsonApi } from './json-api.ts'
+export type { FetchOptions, FetchParams, JsonApiFetcher, PageOption } from './json-api-fetcher.ts'
+export { camel } from './util.ts'

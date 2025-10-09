@@ -1,5 +1,5 @@
-import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetcherImpl } from './json-api-fetcher.js'
-import { camel } from './util.js'
+import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetcherImpl } from './json-api-fetcher.ts'
+import { camel } from './util.ts'
 
 export interface JsonApiResourceIdentifier {
   id: string
