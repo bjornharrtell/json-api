@@ -128,10 +128,6 @@ export interface ModelDefinition<T extends BaseRecord = BaseRecord> {
    * Optional relationships for the model
    */
   relationships?: Record<string, Relationship>
-  /**
-   * Optional factory function to create typed instances
-   */
-  factory?: (id: string, attributes?: Partial<T>) => T
 }
 
 export interface JsonApiConfig {
@@ -233,22 +229,13 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     if (!modelDef) throw new Error(`Model type ${type} not defined`)
 
     const id = properties.id ?? crypto.randomUUID()
-    
-    if (modelDef.factory) {
-      const record = modelDef.factory(id, properties) as T
-      return setRecordType(record, type)
-    }
 
-    // Default factory - create a plain object
     const record = { id, ...properties } as T
-    
-    // Store the type using symbol
     setRecordType(record, type)
     
     // Normalize property keys if needed
     if (config.kebabCase) {
       const normalizedRecord = { id } as Record<string, unknown>
-      // Store the type using symbol
       setRecordType(normalizedRecord as BaseRecord, type)
       for (const [key, value] of Object.entries(properties)) {
         if (key !== 'id' && value !== undefined) {
