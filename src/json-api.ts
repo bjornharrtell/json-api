@@ -107,11 +107,14 @@ function setRelationship(record: BaseRecord, name: string, value: unknown): void
   (record as Record<string, unknown>)[name] = value
 }
 
+export interface BaseEntity {
+  id: string
+}
+
 /**
  * Base interface for records
  */
-export interface BaseRecord {
-  id: string
+export interface BaseRecord extends BaseEntity {
   [JSON_API_TYPE]?: string
   [key: string]: unknown
 }
@@ -165,7 +168,7 @@ export interface JsonApi {
    * Find all records of a given type
    * @returns the JSON API document that was fetched and the records that were found
    */
-  findAll<T extends BaseRecord>(
+  findAll<T extends BaseEntity>(
     type: string,
     options?: FetchOptions,
     params?: FetchParams,
@@ -175,7 +178,7 @@ export interface JsonApi {
    * Find a single record by id
    * @returns the record that was found
    */
-  findRecord<T extends BaseRecord>(
+  findRecord<T extends BaseEntity>(
     type: string,
     id: string,
     options?: FetchOptions,
@@ -186,7 +189,7 @@ export interface JsonApi {
    * Find related records for a given record and relationship name
    * @returns the JSON API document that was fetched
    */
-  findRelated<T extends BaseRecord>(
+  findRelated<T extends BaseEntity>(
     record: T, 
     relationshipName: string, 
     options?: FetchOptions, 
@@ -196,12 +199,12 @@ export interface JsonApi {
   /**
    * Create a new record instance
    */
-  createRecord<T extends BaseRecord>(type: string, properties: Partial<T> & { id?: string }): T
+  createRecord<T extends BaseEntity>(type: string, properties: Partial<T> & { id?: string }): T
 
   /**
    * Save a record
    */
-  saveRecord<T extends BaseRecord>(record: T): Promise<void>
+  saveRecord<T extends BaseEntity>(record: T): Promise<void>
 }
 
 export type JsonApiUseFunction = () => JsonApi
@@ -224,18 +227,18 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return config.kebabCase ? camel(str) : str
   }
 
-  function createRecord<T extends BaseRecord>(type: string, properties: Partial<T> & { id?: string }): T {
+  function createRecord<T extends BaseEntity>(type: string, properties: Partial<T> & { id?: string }): T {
     const modelDef = modelDefinitions.get(type)
     if (!modelDef) throw new Error(`Model type ${type} not defined`)
 
     const id = properties.id ?? crypto.randomUUID()
 
-    const record = { id, ...properties } as T
+    const record = { id, ...properties } as T & BaseRecord
     setRecordType(record, type)
     
     // Normalize property keys if needed
     if (config.kebabCase) {
-      const normalizedRecord = { id } as Record<string, unknown>
+      const normalizedRecord = { id } as Record<string, unknown> & BaseRecord
       setRecordType(normalizedRecord as BaseRecord, type)
       for (const [key, value] of Object.entries(properties)) {
         if (key !== 'id' && value !== undefined) {
@@ -245,10 +248,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
       return normalizedRecord as T
     }
     
-    return record
+    return record as T
   }
 
-  function resourcesToRecords<T extends BaseRecord>(
+  function resourcesToRecords<T extends BaseEntity>(
     type: string,
     resources: JsonApiResource[],
     included?: JsonApiResource[],
@@ -257,10 +260,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     const includedMap = new Map<string, BaseRecord>()
     if (included) {
       for (const resource of included) {
-        const record = createRecord<BaseRecord>(resource.type, {
+        const record = createRecord<BaseEntity>(resource.type, {
           id: resource.id,
           ...(resource.attributes as Record<string, unknown>),
-        })
+        }) as BaseRecord
         includedMap.set(resource.id, record)
       }
     }
@@ -275,7 +278,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
 
     const recordsMap = new Map<string, BaseRecord>()
     for (const record of records) {
-      recordsMap.set(record.id, record)
+      recordsMap.set(record.id, record as unknown as BaseRecord)
     }
 
     // Populate relationships
@@ -316,7 +319,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return records
   }
 
-  async function findAll<T extends BaseRecord>(
+  async function findAll<T extends BaseEntity>(
     type: string,
     options?: FetchOptions,
     params?: FetchParams,
@@ -327,7 +330,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return { doc, records }
   }
 
-  async function findRecord<T extends BaseRecord>(
+  async function findRecord<T extends BaseEntity>(
     type: string,
     id: string,
     options?: FetchOptions,
@@ -341,14 +344,14 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return record
   }
 
-  async function findRelated<T extends BaseRecord>(
+  async function findRelated<T extends BaseEntity>(
     record: T,
     relationshipName: string,
     options?: FetchOptions,
     params?: FetchParams,
   ): Promise<JsonApiDocument> {
     // Get the type from the symbol
-    const recordType = getRecordType(record)
+    const recordType = getRecordType(record as unknown as BaseRecord)
     if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
     
     const rels = relationshipDefinitions.get(recordType)
@@ -364,7 +367,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
         id: related.id,
         ...(related.attributes as Record<string, unknown>),
       })
-      setRelationship(record, relationshipName, relatedRecord)
+      setRelationship(record as unknown as BaseRecord, relationshipName, relatedRecord)
       return doc
     }
 
@@ -378,22 +381,22 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
       ...(r.attributes as Record<string, unknown>),
     }))
     
-    setRelationship(record, relationshipName, rel.relationshipType === RelationshipType.HasMany 
+    setRelationship(record as unknown as BaseRecord, relationshipName, rel.relationshipType === RelationshipType.HasMany 
       ? relatedRecords 
       : relatedRecords[0])
     
     return doc
   }
 
-  async function saveRecord<T extends BaseRecord>(record: T): Promise<void> {
+  async function saveRecord<T extends BaseEntity>(record: T): Promise<void> {
     // Get the type from the symbol
-    const recordType = getRecordType(record)
+    const recordType = getRecordType(record as unknown as BaseRecord)
     if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
     
     const resource: JsonApiResource = {
       id: record.id,
       type: recordType,
-      attributes: record,
+      attributes: record as Record<string, unknown>,
     }
     await _fetcher.post(resource)
   }

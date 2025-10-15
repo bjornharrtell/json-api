@@ -1,5 +1,5 @@
 import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
-import { type BaseRecord, type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
+import { type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
 import type { JsonApiFetcher } from '../json-api-fetcher.ts'
 import doc from './articles.json'
 
@@ -65,18 +65,21 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   }
 }
 
-export interface Person extends BaseRecord {
+export interface Person {
+  id: string
   firstName?: string
   lastName?: string
   twitter?: string
 }
 
-export interface Comment extends BaseRecord {
+export interface Comment {
+  id: string
   body?: string
   author?: Person | null
 }
 
-export interface Article extends BaseRecord {
+export interface Article {
+  id: string
   title?: string
   author?: Person | null
   comments?: Comment[]
