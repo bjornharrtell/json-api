@@ -1,5 +1,5 @@
 import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
-import { Model, type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
+import { type BaseRecord, type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
 import type { JsonApiFetcher } from '../json-api-fetcher.ts'
 import doc from './articles.json'
 
@@ -65,41 +65,38 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   }
 }
 
-export class Person extends Model {
+export interface Person extends BaseRecord {
   firstName?: string
   lastName?: string
   twitter?: string
 }
 
-export class Comment extends Model {
+export interface Comment extends BaseRecord {
   body?: string
-  author: Person | null = null
+  author?: Person | null
 }
 
-export class Article extends Model {
+export interface Article extends BaseRecord {
   title?: string
-  author: Person | null = null
-  comments: Comment[] = []
+  author?: Person | null
+  comments?: Comment[]
 }
 
 const modelDefinitions: ModelDefinition[] = [
   {
     type: 'people',
-    ctor: Person,
   },
   {
     type: 'comments',
-    ctor: Comment,
-    rels: {
-      author: { ctor: Person, type: RelationshipType.BelongsTo },
+    relationships: {
+      author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
     },
   },
   {
     type: 'articles',
-    ctor: Article,
-    rels: {
-      author: { ctor: Person, type: RelationshipType.BelongsTo },
-      comments: { ctor: Comment, type: RelationshipType.HasMany },
+    relationships: {
+      author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+      comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
     },
   },
 ]

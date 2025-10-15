@@ -73,28 +73,61 @@ export interface JsonApiError {
 }
 
 /**
- * Base class for models
+ * Symbol for storing the JSON:API type on records
+ * @public
  */
-export class Model {
-  constructor(public id: string) {
-    this.id = id
-  }
+export const JSON_API_TYPE = Symbol('jsonApiType')
+
+/**
+ * Helper type for records with the JSON:API type symbol
+ */
+type RecordWithType = BaseRecord & {
+  [JSON_API_TYPE]: string
+}
+
+/**
+ * Type-safe helper to set the JSON:API type on a record
+ */
+function setRecordType<T extends BaseRecord>(record: T, type: string): T {
+  (record as RecordWithType)[JSON_API_TYPE] = type
+  return record
+}
+
+/**
+ * Type-safe helper to get the JSON:API type from a record
+ */
+function getRecordType(record: BaseRecord): string | undefined {
+  return (record as RecordWithType)[JSON_API_TYPE]
+}
+
+/**
+ * Type-safe helper to set a relationship on a record
+ */
+function setRelationship(record: BaseRecord, name: string, value: unknown): void {
+  (record as Record<string, unknown>)[name] = value
+}
+
+/**
+ * Base interface for records
+ */
+export interface BaseRecord {
+  id: string
+  [JSON_API_TYPE]?: string
   [key: string]: unknown
 }
 
-export interface ModelDefinition {
+/**
+ * Model definition
+ */
+export interface ModelDefinition<T extends BaseRecord = BaseRecord> {
   /**
    * The JSON:API type for the model
    */
   type: string
   /**
-   * The model constructor
+   * Optional relationships for the model
    */
-  ctor: typeof Model
-  /**
-   * Relationships for the model
-   */
-  rels?: Record<string, Relationship>
+  relationships?: Record<string, Relationship>
 }
 
 export interface JsonApiConfig {
@@ -121,198 +154,255 @@ export enum RelationshipType {
  * Relationship definition
  */
 export interface Relationship {
-  ctor: typeof Model
-  type: RelationshipType
+  /** The JSON:API type name of the related model */
+  type: string
+  /** The relationship type */
+  relationshipType: RelationshipType
 }
 
 export interface JsonApi {
   /**
-   * Models registered with this store
-   */
-  modelRegistry: Map<typeof Model, string>
-  /**
-   * Relationships registered with this store
-   */
-  relRegistry: Map<typeof Model, Record<string, Relationship>>
-  /**
-   * @internal
-   */
-  createRecord<T extends typeof Model>(ctor: T, properties: Partial<InstanceType<T>> & { id?: string }): InstanceType<T>
-  /**
    * Find all records of a given type
    * @returns the JSON API document that was fetched and the records that were found
    */
-  findAll<T extends typeof Model>(
-    ctor: T,
+  findAll<T extends BaseRecord>(
+    type: string,
     options?: FetchOptions,
     params?: FetchParams,
-  ): Promise<{ doc: JsonApiDocument; records: InstanceType<T>[] }>
+  ): Promise<{ doc: JsonApiDocument; records: T[] }>
+
   /**
    * Find a single record by id
    * @returns the record that was found
    */
-  findRecord<T extends typeof Model>(
-    ctor: T,
+  findRecord<T extends BaseRecord>(
+    type: string,
     id: string,
     options?: FetchOptions,
     params?: FetchParams,
-  ): Promise<InstanceType<T>>
+  ): Promise<T>
+
   /**
    * Find related records for a given record and relationship name
    * @returns the JSON API document that was fetched
    */
-  findRelated(record: Model, name: string, options?: FetchOptions, params?: FetchParams): Promise<JsonApiDocument>
+  findRelated<T extends BaseRecord>(
+    record: T, 
+    relationshipName: string, 
+    options?: FetchOptions, 
+    params?: FetchParams
+  ): Promise<JsonApiDocument>
+
+  /**
+   * Create a new record instance
+   */
+  createRecord<T extends BaseRecord>(type: string, properties: Partial<T> & { id?: string }): T
+
+  /**
+   * Save a record
+   */
+  saveRecord<T extends BaseRecord>(record: T): Promise<void>
 }
 
 export type JsonApiUseFunction = () => JsonApi
 
-export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
+export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): JsonApi {
   const _fetcher = fetcher ?? new JsonApiFetcherImpl(config.endpoint)
 
-  const modelRegistry = new Map<typeof Model, string>()
-  const modelsByType = new Map<string, typeof Model>()
-  const relsRegistry = new Map<typeof Model, Record<string, Relationship>>()
+  // Map type names to their definitions
+  const modelDefinitions = new Map<string, ModelDefinition>()
+  const relationshipDefinitions = new Map<string, Record<string, Relationship>>()
 
   for (const modelDef of config.modelDefinitions) {
-    const ctor = modelDef.ctor
-    modelRegistry.set(ctor, modelDef.type)
-    modelsByType.set(modelDef.type, ctor)
-    if (modelDef.rels) relsRegistry.set(ctor, modelDef.rels)
+    modelDefinitions.set(modelDef.type, modelDef)
+    if (modelDef.relationships) {
+      relationshipDefinitions.set(modelDef.type, modelDef.relationships)
+    }
   }
 
   function normalize(str: string) {
     return config.kebabCase ? camel(str) : str
   }
 
-  function internalCreateRecord<T extends typeof Model>(ctor: T, id: string, properties?: Partial<InstanceType<T>>) {
-    const record = new ctor(id)
-    if (properties)
-      for (const [key, value] of Object.entries(properties)) if (value !== undefined) record[normalize(key)] = value
-    return record as InstanceType<T>
+  function createRecord<T extends BaseRecord>(type: string, properties: Partial<T> & { id?: string }): T {
+    const modelDef = modelDefinitions.get(type)
+    if (!modelDef) throw new Error(`Model type ${type} not defined`)
+
+    const id = properties.id ?? crypto.randomUUID()
+
+    const record = { id, ...properties } as T
+    setRecordType(record, type)
+    
+    // Normalize property keys if needed
+    if (config.kebabCase) {
+      const normalizedRecord = { id } as Record<string, unknown>
+      setRecordType(normalizedRecord as BaseRecord, type)
+      for (const [key, value] of Object.entries(properties)) {
+        if (key !== 'id' && value !== undefined) {
+          normalizedRecord[normalize(key)] = value
+        }
+      }
+      return normalizedRecord as T
+    }
+    
+    return record
   }
 
-  function getModelType(ctor: typeof Model) {
-    const type = modelRegistry.get(ctor)
-    if (!type) throw new Error(`Model ${ctor.name} not defined`)
-    return type
-  }
-
-  function getModel(type: string) {
-    const ctor = modelsByType.get(type)
-    if (!ctor) throw new Error(`Model with name ${type} not defined`)
-    return ctor
-  }
-
-  function resourcesToRecords<T extends typeof Model>(
-    ctor: T,
+  function resourcesToRecords<T extends BaseRecord>(
+    type: string,
     resources: JsonApiResource[],
     included?: JsonApiResource[],
-  ) {
-    function createRecord<T extends typeof Model>(resource: JsonApiResource) {
-      return internalCreateRecord<T>(
-        getModel(resource.type) as T,
-        resource.id,
-        resource.attributes as Partial<InstanceType<T>>,
-      )
+  ): T[] {
+    // Create records for included resources
+    const includedMap = new Map<string, BaseRecord>()
+    if (included) {
+      for (const resource of included) {
+        const record = createRecord<BaseRecord>(resource.type, {
+          id: resource.id,
+          ...(resource.attributes as Record<string, unknown>),
+        })
+        includedMap.set(resource.id, record)
+      }
     }
-    // create records for included resources
-    const includedMap = new Map<string, InstanceType<typeof Model>>()
-    if (included) for (const resource of included) includedMap.set(resource.id, createRecord(resource))
-    // create records for main resources
-    const records = resources.map((r) => internalCreateRecord<T>(ctor, r.id, r.attributes as Partial<InstanceType<T>>))
-    const recordsMap = new Map<string, InstanceType<typeof Model>>()
-    for (const r of records) recordsMap.set(r.id, r)
-    // populate relationships
+
+    // Create records for main resources
+    const records = resources.map(resource => 
+      createRecord<T>(type, {
+        id: resource.id,
+        ...(resource.attributes as Partial<T>),
+      })
+    )
+
+    const recordsMap = new Map<string, BaseRecord>()
+    for (const record of records) {
+      recordsMap.set(record.id, record)
+    }
+
+    // Populate relationships
     function populateRelationships(resource: JsonApiResource) {
       const record = recordsMap.get(resource.id) ?? includedMap.get(resource.id)
       if (!record) throw new Error('Unexpected not found record')
-      const recordCtor = getModel(resource.type)
+      
       if (!resource.relationships) return
+
+      const rels = relationshipDefinitions.get(resource.type)
+      if (!rels) return
+
       for (const [name, reldoc] of Object.entries(resource.relationships)) {
-        const rels = relsRegistry.get(recordCtor)
-        // NOTE: if relationship is not defined but exists in data, it is ignored
-        if (!rels) continue
         const normalizedName = normalize(name)
         const rel = rels[normalizedName]
-        if (!rel) throw new Error(`Relationship ${normalizedName} not defined`)
-        const relType = getModelType(rel.ctor)
-        const rids =
-          rel.type === RelationshipType.HasMany
-            ? (reldoc.data as JsonApiResourceIdentifier[])
-            : [reldoc.data as JsonApiResourceIdentifier]
-        const relIncludedRecords = rids
-          .filter((d) => d && includedMap.has(d.id) && d.type === relType)
-          .map((d) => includedMap.get(d.id))
-        const relRecords = rids
-          .filter((d) => d && recordsMap.has(d.id) && d.type === relType)
-          .map((d) => recordsMap.get(d.id))
-        relRecords.push(...relIncludedRecords)
-        record[normalizedName] = rel.type === RelationshipType.HasMany ? relRecords : relRecords[0]
+        if (!rel) continue // Ignore undefined relationships
+
+        const rids = rel.relationshipType === RelationshipType.HasMany
+          ? (reldoc.data as JsonApiResourceIdentifier[])
+          : [reldoc.data as JsonApiResourceIdentifier]
+
+        const relatedRecords = rids
+          .filter(d => d && d.type === rel.type)
+          .map(d => includedMap.get(d.id) || recordsMap.get(d.id))
+          .filter(Boolean)
+
+        setRelationship(record, normalizedName, rel.relationshipType === RelationshipType.HasMany 
+          ? relatedRecords 
+          : relatedRecords[0])
       }
     }
+
     if (included) {
-      resources.map(populateRelationships)
-      included.map(populateRelationships)
+      resources.forEach(populateRelationships)
+      included.forEach(populateRelationships)
     }
-    return records as InstanceType<T>[]
+
+    return records
   }
 
-  async function findAll<T extends typeof Model>(ctor: T, options?: FetchOptions, params?: FetchParams) {
-    const type = getModelType(ctor)
+  async function findAll<T extends BaseRecord>(
+    type: string,
+    options?: FetchOptions,
+    params?: FetchParams,
+  ): Promise<{ doc: JsonApiDocument; records: T[] }> {
     const doc = await _fetcher.fetchDocument(type, undefined, options, params)
     const resources = doc.data as JsonApiResource[]
-    const records = resourcesToRecords(ctor, resources, doc.included)
+    const records = resourcesToRecords<T>(type, resources, doc.included)
     return { doc, records }
   }
 
-  async function findRecord<T extends typeof Model>(ctor: T, id: string, options?: FetchOptions, params?: FetchParams) {
-    const type = getModelType(ctor)
+  async function findRecord<T extends BaseRecord>(
+    type: string,
+    id: string,
+    options?: FetchOptions,
+    params?: FetchParams,
+  ): Promise<T> {
     const doc = await _fetcher.fetchDocument(type, id, options, params)
     const resource = doc.data as JsonApiResource
-    const records = resourcesToRecords(ctor, [resource], doc.included)
+    const records = resourcesToRecords<T>(type, [resource], doc.included)
     const record = records[0]
     if (!record) throw new Error(`Record with id ${id} not found`)
-    return record as InstanceType<T>
+    return record
   }
 
-  async function findRelated(record: Model, name: string, options?: FetchOptions, params?: FetchParams) {
-    const ctor = record.constructor as typeof Model
-    const type = getModelType(ctor)
-    const rels = relsRegistry.get(ctor)
-    if (!rels) throw new Error(`Model ${ctor.name} has no relationships`)
-    const rel = rels[name]
-    if (!rel) throw new Error(`Has many relationship ${name} not defined`)
-    if (rel.type === RelationshipType.BelongsTo) {
-      const doc = await _fetcher.fetchBelongsTo(type, record.id, name, options, params)
+  async function findRelated<T extends BaseRecord>(
+    record: T,
+    relationshipName: string,
+    options?: FetchOptions,
+    params?: FetchParams,
+  ): Promise<JsonApiDocument> {
+    // Get the type from the symbol
+    const recordType = getRecordType(record)
+    if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
+    
+    const rels = relationshipDefinitions.get(recordType)
+    if (!rels) throw new Error(`Model ${recordType} has no relationships`)
+    
+    const rel = rels[relationshipName]
+    if (!rel) throw new Error(`Relationship ${relationshipName} not defined`)
+
+    if (rel.relationshipType === RelationshipType.BelongsTo) {
+      const doc = await _fetcher.fetchBelongsTo(recordType, record.id, relationshipName, options, params)
       const related = doc.data as JsonApiResource
-      const relatedRecord = internalCreateRecord(rel.ctor, related.id, related.attributes)
-      record[name] = relatedRecord
+      const relatedRecord = createRecord(rel.type, {
+        id: related.id,
+        ...(related.attributes as Record<string, unknown>),
+      })
+      setRelationship(record, relationshipName, relatedRecord)
       return doc
     }
-    const doc = await _fetcher.fetchHasMany(type, record.id, name, options, params)
-    const related =
-      rel.type === RelationshipType.HasMany ? (doc.data as JsonApiResource[]) : [doc.data as JsonApiResource]
-    const relatedRecords = related.map((r) => internalCreateRecord(rel.ctor, r.id, r.attributes))
-    record[name] = rel.type === RelationshipType.HasMany ? relatedRecords : relatedRecords[0]
+
+    const doc = await _fetcher.fetchHasMany(recordType, record.id, relationshipName, options, params)
+    const related = rel.relationshipType === RelationshipType.HasMany
+      ? (doc.data as JsonApiResource[])
+      : [doc.data as JsonApiResource]
+    
+    const relatedRecords = related.map(r => createRecord(rel.type, {
+      id: r.id,
+      ...(r.attributes as Record<string, unknown>),
+    }))
+    
+    setRelationship(record, relationshipName, rel.relationshipType === RelationshipType.HasMany 
+      ? relatedRecords 
+      : relatedRecords[0])
+    
     return doc
   }
 
-  async function saveRecord(record: Model) {
-    const type = getModelType(record.constructor as typeof Model)
+  async function saveRecord<T extends BaseRecord>(record: T): Promise<void> {
+    // Get the type from the symbol
+    const recordType = getRecordType(record)
+    if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
+    
     const resource: JsonApiResource = {
       id: record.id,
-      type,
+      type: recordType,
       attributes: record,
     }
     await _fetcher.post(resource)
   }
 
   return {
-    modelRegistry,
-    relsRegistry,
     findAll,
     findRecord,
     findRelated,
+    createRecord,
     saveRecord,
   }
 }
