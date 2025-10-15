@@ -122,7 +122,7 @@ export interface BaseRecord extends BaseEntity {
 /**
  * Model definition
  */
-export interface ModelDefinition<T extends BaseRecord = BaseRecord> {
+export interface ModelDefinition {
   /**
    * The JSON:API type for the model
    */
