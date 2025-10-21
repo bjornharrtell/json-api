@@ -2,7 +2,7 @@ import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetche
 import { camel } from './util.ts'
 
 export interface JsonApiResourceIdentifier {
-  id: string
+  id?: string
   lid?: string
   type: string
 }
@@ -12,7 +12,7 @@ export interface JsonApiRelationship {
 }
 
 export interface JsonApiResource {
-  id: string
+  id?: string
   lid?: string
   type: string
   attributes: Record<string, unknown>
@@ -99,15 +99,10 @@ function setRelationship(record: BaseRecord, name: string, value: unknown): void
 
 export interface AtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data: LocalBaseEntity
+  data: BaseEntity
 }
 
 export interface BaseEntity {
-  id: string
-  type: string
-}
-
-export type LocalBaseEntity =  {
   id?: string
   lid?: string
   type: string
@@ -164,20 +159,6 @@ export interface Relationship {
   relationshipType: RelationshipType
 }
 
-function serialize(record: BaseRecord): JsonApiResource {
-  const resource: JsonApiResource = {
-    id: record.id,
-    type: record.type,
-    attributes: {},
-  }
-  for (const [key, value] of Object.entries(record)) {
-    if (key !== 'id' && key !== 'type' && value !== undefined) {
-      resource.attributes[key] = value
-    }
-  }
-  return resource
-}
-
 export type JsonApi = ReturnType<typeof useJsonApi>
 
 export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
@@ -196,6 +177,47 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   function normalize(str: string) {
     return config.kebabCase ? camel(str) : str
+  }
+
+  function serializeRid(entity: BaseEntity): JsonApiResourceIdentifier {
+    const rid: JsonApiResourceIdentifier = { type: entity.type }
+    if (entity.id) rid.id = entity.id
+    if (entity.lid) rid.lid = entity.lid
+    return rid
+  }
+
+  function serialize(record: BaseRecord): JsonApiResource {
+    const relationships = relationshipDefinitions.get(record.type) 
+    const resource: JsonApiResource = {
+      id: record.id,
+      type: record.type,
+      attributes: {}
+    }
+    if (relationships)
+      resource.relationships = {}
+    for (const [key, value] of Object.entries(record)) {
+      if (key === 'id' || key === 'type' || value === undefined)
+        continue
+      if (relationships && key in relationships) {
+        const rel = relationships[key]
+        if (rel.relationshipType === RelationshipType.HasMany) {
+          const entities = value as unknown as BaseEntity[]
+          resource.relationships![key] = {
+            data: entities.map(serializeRid),
+          }
+        } else if (rel.relationshipType === RelationshipType.BelongsTo) {
+          const entity = value as unknown as BaseEntity
+          resource.relationships![key] = {
+            data: serializeRid(entity),
+          }
+        } else {
+          throw new Error(`Unknown relationship type for ${key}`)
+        }
+      } else {
+        resource.attributes[key] = value
+      }
+    }
+    return resource
   }
 
   function createRecord<T extends BaseEntity>(type: string, properties: Partial<T> & { id?: string }): T {
@@ -232,7 +254,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
           id: resource.id,
           ...(resource.attributes as Record<string, unknown>),
         }) as BaseRecord
-        includedMap.set(resource.id, record)
+        includedMap.set(resource.id!, record)
       }
     }
 
@@ -246,12 +268,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
     const recordsMap = new Map<string, BaseRecord>()
     for (const record of records) {
-      recordsMap.set(record.id, record as unknown as BaseRecord)
+      recordsMap.set(record.id!, record as unknown as BaseRecord)
     }
 
     // Populate relationships
     function populateRelationships(resource: JsonApiResource) {
-      const record = recordsMap.get(resource.id) ?? includedMap.get(resource.id)
+      const record = recordsMap.get(resource.id!) ?? includedMap.get(resource.id!)
       if (!record) throw new Error('Unexpected not found record')
       
       if (!resource.relationships) return
@@ -270,7 +292,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
         const relatedRecords = rids
           .filter(d => d && d.type === rel.type)
-          .map(d => includedMap.get(d.id) || recordsMap.get(d.id))
+          .map(d => includedMap.get(d.id!) || recordsMap.get(d.id!))
           .filter(Boolean)
 
         setRelationship(record, normalizedName, rel.relationshipType === RelationshipType.HasMany 
@@ -326,7 +348,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     if (!rel) throw new Error(`Relationship ${relationshipName} not defined`)
 
     if (rel.relationshipType === RelationshipType.BelongsTo) {
-      const doc = await _fetcher.fetchBelongsTo(type, record.id, relationshipName, options, params)
+      const doc = await _fetcher.fetchBelongsTo(type, record.id!, relationshipName, options, params)
       const related = doc.data as JsonApiResource
       const relatedRecord = createRecord(rel.type, {
         id: related.id,
@@ -336,7 +358,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       return doc
     }
 
-    const doc = await _fetcher.fetchHasMany(type, record.id, relationshipName, options, params)
+    const doc = await _fetcher.fetchHasMany(type, record.id!, relationshipName, options, params)
     const related = rel.relationshipType === RelationshipType.HasMany
       ? (doc.data as JsonApiResource[])
       : [doc.data as JsonApiResource]
@@ -353,7 +375,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return doc
   }
 
-  async function saveRecord<T extends BaseEntity>(record: LocalBaseEntity, options?: FetchOptions): Promise<T> {
+  async function saveRecord<T extends BaseEntity>(record: BaseEntity, options?: FetchOptions): Promise<T> {
     const resource = serialize(record as unknown as BaseRecord)
     const doc = await _fetcher.post(resource, options)
     const records = resourcesToRecords<T>([doc.data] as JsonApiResource[])

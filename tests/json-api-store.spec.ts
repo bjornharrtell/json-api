@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { type Article, articlesJsonApi } from '../src/stores/articles.ts'
-import { AtomicOperation } from '../src/json-api.ts'
+import { type Article, articlesJsonApi, Person } from '../src/stores/articles.ts'
+import { AtomicOperation, JsonApiResourceIdentifier } from '../src/json-api.ts'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
@@ -43,15 +43,27 @@ describe('JsonApiStore', () => {
   })
 
   test('save atomic', async () => {
+    const newAuthor = {
+      lid: 'local-1',
+      type: 'people',
+      firstName: 'John',
+      lastName: 'Doe'
+    } as Person
     const newArticle = {
       type: 'articles',
-      title: 'test222'
+      title: 'test222',
+      author: newAuthor
     } as Article
-    const operations = [{
+    const operations: AtomicOperation[] = [{
+      op: 'add',
+      data: newAuthor
+    },{
       op: 'add',
       data: newArticle
-    } as AtomicOperation]
+    }]
     const result = await articlesJsonApi.saveAtomic(operations)
     expect(result.doc.data[0].attributes.title, newArticle.title)
+    const rid = result.doc.data[1].relationships!['author'].data as JsonApiResourceIdentifier
+    expect(rid.lid, 'local-1')
   })
 })
