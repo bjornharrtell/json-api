@@ -1,6 +1,6 @@
 export type {
   JsonApi,
-  JsonApiConfig as JsonApiStoreConfig,
+  JsonApiConfig,
   JsonApiDocument,
   JsonApiError,
   JsonApiLink,
@@ -10,6 +10,9 @@ export type {
   JsonApiRelationship,
   JsonApiResource,
   JsonApiResourceIdentifier,
+  JsonApiAtomicDocument,
+  JsonApiAtomicOperation,
+  JsonApiAtomicResults,
   ModelDefinition,
   Relationship,
 } from './json-api.ts'
