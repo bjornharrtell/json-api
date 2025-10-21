@@ -79,17 +79,10 @@ export interface JsonApiError {
 export const JSON_API_TYPE = Symbol('jsonApiType')
 
 /**
- * Helper type for records with the JSON:API type symbol
- */
-type RecordWithType = BaseRecord & {
-  [JSON_API_TYPE]: string
-}
-
-/**
  * Type-safe helper to set the JSON:API type on a record
  */
 function setRecordType<T extends BaseRecord>(record: T, type: string): T {
-  (record as RecordWithType)[JSON_API_TYPE] = type
+  record[JSON_API_TYPE] = type
   return record
 }
 
@@ -97,7 +90,7 @@ function setRecordType<T extends BaseRecord>(record: T, type: string): T {
  * Type-safe helper to get the JSON:API type from a record
  */
 function getRecordType(record: BaseRecord): string | undefined {
-  return (record as RecordWithType)[JSON_API_TYPE]
+  return record[JSON_API_TYPE]
 }
 
 /**
