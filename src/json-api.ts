@@ -90,29 +90,15 @@ export interface JsonApiAtomicDocument {
   errors?: JsonApiError[]
 }
 
-/**
- * Type-safe helper to set a relationship on a record
- */
-function setRelationship(record: BaseRecord, name: string, value: unknown): void {
-  (record as Record<string, unknown>)[name] = value
-}
-
 export interface AtomicOperation {
   op: 'add' | 'update' | 'remove'
   data: BaseEntity
 }
 
 export interface BaseEntity {
-  id?: string
+  id: string
   lid?: string
   type: string
-}
-
-/**
- * Base interface for records
- */
-export interface BaseRecord extends BaseEntity {
-  [key: string]: unknown
 }
 
 /**
@@ -159,6 +145,10 @@ export interface Relationship {
   relationshipType: RelationshipType
 }
 
+function setRelationship(record: BaseEntity, name: string, value: unknown): void {
+  (record as unknown as Record<string, unknown>)[name] = value
+}
+
 export type JsonApi = ReturnType<typeof useJsonApi>
 
 export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
@@ -170,9 +160,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   for (const modelDef of config.modelDefinitions) {
     modelDefinitions.set(modelDef.type, modelDef)
-    if (modelDef.relationships) {
+    if (modelDef.relationships)
       relationshipDefinitions.set(modelDef.type, modelDef.relationships)
-    }
   }
 
   function normalize(str: string) {
@@ -181,18 +170,15 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   function serializeRid(entity: BaseEntity): JsonApiResourceIdentifier {
     const rid: JsonApiResourceIdentifier = { type: entity.type }
-    if (entity.id) rid.id = entity.id
     if (entity.lid) rid.lid = entity.lid
+    else if (entity.id) rid.id = entity.id
     return rid
   }
 
-  function serialize(record: BaseRecord): JsonApiResource {
+  function serialize(record: BaseEntity): JsonApiResource {
     const relationships = relationshipDefinitions.get(record.type) 
-    const resource: JsonApiResource = {
-      id: record.id,
-      type: record.type,
-      attributes: {}
-    }
+    const resource: JsonApiResource = serializeRid(record) as JsonApiResource
+    resource.attributes = {}
     if (relationships)
       resource.relationships = {}
     for (const [key, value] of Object.entries(record)) {
@@ -230,12 +216,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     
     // Normalize property keys if needed
     if (config.kebabCase) {
-      const normalizedRecord = { id, type } as Record<string, unknown> & BaseRecord
-      for (const [key, value] of Object.entries(properties)) {
-        if (key !== 'id' && value !== undefined) {
+      const normalizedRecord = { id, type } as BaseEntity & Record<string, unknown>
+      for (const [key, value] of Object.entries(properties))
+        if (key !== 'id' && value !== undefined)
           normalizedRecord[normalize(key)] = value
-        }
-      }
       return normalizedRecord as T
     }
     
@@ -247,13 +231,13 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     included?: JsonApiResource[],
   ): T[] {
     // Create records for included resources
-    const includedMap = new Map<string, BaseRecord>()
+    const includedMap = new Map<string, BaseEntity>()
     if (included) {
       for (const resource of included) {
         const record = createRecord<BaseEntity>(resource.type, {
           id: resource.id,
-          ...(resource.attributes as Record<string, unknown>),
-        }) as BaseRecord
+          ...resource.attributes,
+        })
         includedMap.set(resource.id!, record)
       }
     }
@@ -266,10 +250,9 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       })
     )
 
-    const recordsMap = new Map<string, BaseRecord>()
-    for (const record of records) {
-      recordsMap.set(record.id!, record as unknown as BaseRecord)
-    }
+    const recordsMap = new Map<string, BaseEntity>()
+    for (const record of records)
+      recordsMap.set(record.id!, record)
 
     // Populate relationships
     function populateRelationships(resource: JsonApiResource) {
@@ -334,8 +317,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return record
   }
 
-  async function findRelated<T extends BaseEntity>(
-    record: T,
+  async function findRelated(
+    record: BaseEntity,
     relationshipName: string,
     options?: FetchOptions,
     params?: FetchParams,
@@ -352,9 +335,9 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       const related = doc.data as JsonApiResource
       const relatedRecord = createRecord(rel.type, {
         id: related.id,
-        ...(related.attributes as Record<string, unknown>),
+        ...related.attributes,
       })
-      setRelationship(record as unknown as BaseRecord, relationshipName, relatedRecord)
+      setRelationship(record, relationshipName, relatedRecord)
       return doc
     }
 
@@ -365,10 +348,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     
     const relatedRecords = related.map(r => createRecord(rel.type, {
       id: r.id,
-      ...(r.attributes as Record<string, unknown>),
+      ...r.attributes,
     }))
     
-    setRelationship(record as unknown as BaseRecord, relationshipName, rel.relationshipType === RelationshipType.HasMany 
+    setRelationship(record, relationshipName, rel.relationshipType === RelationshipType.HasMany 
       ? relatedRecords 
       : relatedRecords[0])
     
@@ -376,14 +359,14 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   }
 
   async function saveRecord<T extends BaseEntity>(record: BaseEntity, options?: FetchOptions): Promise<T> {
-    const resource = serialize(record as unknown as BaseRecord)
+    const resource = serialize(record)
     const doc = await _fetcher.post(resource, options)
     const records = resourcesToRecords<T>([doc.data] as JsonApiResource[])
     return records[0] as T
   }
 
   async function saveAtomic(operations: AtomicOperation[], options?: FetchOptions): Promise<{ doc: JsonApiAtomicResults; records: BaseEntity[] }> {
-    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.data as unknown as BaseRecord) } as JsonApiAtomicOperation))
+    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.data) } as JsonApiAtomicOperation))
     const atomicDoc: JsonApiAtomicDocument = {
       ['atomic:operations']: atomicOperations,
     }
