@@ -32,7 +32,7 @@ export interface Options {
 
 async function req(url: string, options: Options) {
   const { headers, searchParams, method, signal, body } = options
-  const textSearchParams = `?${searchParams}`
+  const textSearchParams = searchParams ? `?${searchParams}` : ''
   const finalUrl = url.replace(/(?:\?.*?)?(?=#|$)/, textSearchParams)
   const response = await fetch(finalUrl, {
     method,
@@ -109,7 +109,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const body = JSON.stringify(doc)
     const newOptions = this.createOptions(options, {}, body)
     newOptions.method = 'POST'
-    newOptions.headers.append('Accept', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
+    newOptions.headers.set('Accept', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
     newOptions.headers.set('Content-Type', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
     const results = await req(url, newOptions) as JsonApiAtomicResults
     return results

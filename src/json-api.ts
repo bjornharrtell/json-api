@@ -182,7 +182,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     if (relationships)
       resource.relationships = {}
     for (const [key, value] of Object.entries(record)) {
-      if (key === 'id' || key === 'type' || value === undefined)
+      if (key === 'id' || key === 'lid' || key === 'type' || value === undefined)
         continue
       if (relationships && key in relationships) {
         const rel = relationships[key]
