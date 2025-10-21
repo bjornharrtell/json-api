@@ -40,7 +40,7 @@ export interface JsonApiFetcher {
     options?: FetchOptions,
     params?: FetchParams,
   ): Promise<JsonApiDocument>
-  post(data: JsonApiResource): Promise<JsonApiDocument>
+  post(data: JsonApiResource, options?: FetchOptions): Promise<JsonApiDocument>
 }
 
 interface Options {

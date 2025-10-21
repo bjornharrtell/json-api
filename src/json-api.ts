@@ -358,14 +358,14 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return doc
   }
 
-  async function saveRecord<T extends BaseEntity>(record: T): Promise<void> {
+  async function saveRecord<T extends BaseEntity>(record: T, options?: FetchOptions): Promise<void> {
     const type = record.type    
     const resource: JsonApiResource = {
       id: record.id,
       type,
       attributes: record as Record<string, unknown>,
     }
-    await _fetcher.post(resource)
+    await _fetcher.post(resource, options)
   }
 
   return {
