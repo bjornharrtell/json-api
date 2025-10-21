@@ -16,8 +16,10 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   createOptions(options?: FetchOptions, params?: FetchParams, body?: BodyInit): Options {
     throw new Error('Method not implemented.')
   }
-  postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions): Promise<JsonApiAtomicResults> {
-    throw new Error('Method not implemented.')
+  async postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions): Promise<JsonApiAtomicResults> {
+    return {
+      data: doc['atomic:operations']!.map(op => op.data)
+    }
   }
   async fetchDocument(_type: string, id?: string): Promise<JsonApiDocument> {
     if (id) {
@@ -67,8 +69,10 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
     const related = findIncluded(rid)
     return { data: related } as JsonApiDocument
   }
-  async post(_data: JsonApiResource): Promise<JsonApiDocument> {
-    throw new Error('Not implemented')
+  async post(data: JsonApiResource): Promise<JsonApiDocument> {
+    return {
+      data
+    }
   }
 }
 

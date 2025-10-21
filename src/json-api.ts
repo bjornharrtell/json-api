@@ -99,11 +99,16 @@ function setRelationship(record: BaseRecord, name: string, value: unknown): void
 
 export interface AtomicOperation {
   op: 'add' | 'update' | 'remove'
-  record: BaseEntity
+  data: LocalBaseEntity
 }
 
 export interface BaseEntity {
   id: string
+  type: string
+}
+
+export type LocalBaseEntity =  {
+  id?: string
   lid?: string
   type: string
 }
@@ -348,16 +353,15 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return doc
   }
 
-  async function saveRecord<T extends BaseEntity>(record: T, options?: FetchOptions): Promise<T> {
-    const type = record.type    
+  async function saveRecord<T extends BaseEntity>(record: LocalBaseEntity, options?: FetchOptions): Promise<T> {
     const resource = serialize(record as unknown as BaseRecord)
     const doc = await _fetcher.post(resource, options)
-    const records = resourcesToRecords<T>(doc.data as JsonApiResource[])
+    const records = resourcesToRecords<T>([doc.data] as JsonApiResource[])
     return records[0] as T
   }
 
-  async function saveAtomic(operations: AtomicOperation[], options?: FetchOptions): Promise<{ doc: JsonApiDocument; records: BaseEntity[] }> {
-    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.record as unknown as BaseRecord) } as JsonApiAtomicOperation))
+  async function saveAtomic(operations: AtomicOperation[], options?: FetchOptions): Promise<{ doc: JsonApiAtomicResults; records: BaseEntity[] }> {
+    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.data as unknown as BaseRecord) } as JsonApiAtomicOperation))
     const atomicDoc: JsonApiAtomicDocument = {
       ['atomic:operations']: atomicOperations,
     }

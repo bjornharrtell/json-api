@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { type Article, articlesJsonApi } from '../src/stores/articles.ts'
+import { AtomicOperation } from '../src/json-api.ts'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
@@ -30,5 +31,27 @@ describe('JsonApiStore', () => {
     expect(article.comments?.[1]?.author?.firstName).toBe('Dan')
     //await findRelated(article, 'author')
     expect(article.author?.firstName).toBe('Dan')
+  })
+
+  test('save record', async () => {
+    const newArticle = {
+      type: 'articles',
+      title: 'test222'
+    } as Article
+    const result = await articlesJsonApi.saveRecord(newArticle) as Article
+    expect(result.title, newArticle.title)
+  })
+
+  test('save atomic', async () => {
+    const newArticle = {
+      type: 'articles',
+      title: 'test222'
+    } as Article
+    const operations = [{
+      op: 'add',
+      data: newArticle
+    } as AtomicOperation]
+    const result = await articlesJsonApi.saveAtomic(operations)
+    expect(result.doc.data[0].attributes.title, newArticle.title)
   })
 })
