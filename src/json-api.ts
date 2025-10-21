@@ -3,6 +3,7 @@ import { camel } from './util.ts'
 
 export interface JsonApiResourceIdentifier {
   id: string
+  lid?: string
   type: string
 }
 
@@ -12,6 +13,7 @@ export interface JsonApiRelationship {
 
 export interface JsonApiResource {
   id: string
+  lid?: string
   type: string
   attributes: Record<string, unknown>
   relationships?: Record<string, JsonApiRelationship>
@@ -73,27 +75,6 @@ export interface JsonApiError {
 }
 
 /**
- * Symbol for storing the JSON:API type on records
- * @public
- */
-export const JSON_API_TYPE = Symbol('jsonApiType')
-
-/**
- * Type-safe helper to set the JSON:API type on a record
- */
-function setRecordType<T extends BaseRecord>(record: T, type: string): T {
-  record[JSON_API_TYPE] = type
-  return record
-}
-
-/**
- * Type-safe helper to get the JSON:API type from a record
- */
-function getRecordType(record: BaseRecord): string | undefined {
-  return record[JSON_API_TYPE]
-}
-
-/**
  * Type-safe helper to set a relationship on a record
  */
 function setRelationship(record: BaseRecord, name: string, value: unknown): void {
@@ -102,13 +83,14 @@ function setRelationship(record: BaseRecord, name: string, value: unknown): void
 
 export interface BaseEntity {
   id: string
+  lid?: string
+  type: string
 }
 
 /**
  * Base interface for records
  */
 export interface BaseRecord extends BaseEntity {
-  [JSON_API_TYPE]?: string
   [key: string]: unknown
 }
 
@@ -226,13 +208,11 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
 
     const id = properties.id ?? crypto.randomUUID()
 
-    const record = { id, ...properties } as T & BaseRecord
-    setRecordType(record, type)
+    const record = { id, type, ...properties } as T
     
     // Normalize property keys if needed
     if (config.kebabCase) {
-      const normalizedRecord = { id } as Record<string, unknown> & BaseRecord
-      setRecordType(normalizedRecord as BaseRecord, type)
+      const normalizedRecord = { id, type } as Record<string, unknown> & BaseRecord
       for (const [key, value] of Object.entries(properties)) {
         if (key !== 'id' && value !== undefined) {
           normalizedRecord[normalize(key)] = value
@@ -343,18 +323,15 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     options?: FetchOptions,
     params?: FetchParams,
   ): Promise<JsonApiDocument> {
-    // Get the type from the symbol
-    const recordType = getRecordType(record as unknown as BaseRecord)
-    if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
-    
-    const rels = relationshipDefinitions.get(recordType)
-    if (!rels) throw new Error(`Model ${recordType} has no relationships`)
+    const type = record.type
+    const rels = relationshipDefinitions.get(type)
+    if (!rels) throw new Error(`Model ${type} has no relationships`)
     
     const rel = rels[relationshipName]
     if (!rel) throw new Error(`Relationship ${relationshipName} not defined`)
 
     if (rel.relationshipType === RelationshipType.BelongsTo) {
-      const doc = await _fetcher.fetchBelongsTo(recordType, record.id, relationshipName, options, params)
+      const doc = await _fetcher.fetchBelongsTo(type, record.id, relationshipName, options, params)
       const related = doc.data as JsonApiResource
       const relatedRecord = createRecord(rel.type, {
         id: related.id,
@@ -364,7 +341,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
       return doc
     }
 
-    const doc = await _fetcher.fetchHasMany(recordType, record.id, relationshipName, options, params)
+    const doc = await _fetcher.fetchHasMany(type, record.id, relationshipName, options, params)
     const related = rel.relationshipType === RelationshipType.HasMany
       ? (doc.data as JsonApiResource[])
       : [doc.data as JsonApiResource]
@@ -382,13 +359,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
   }
 
   async function saveRecord<T extends BaseEntity>(record: T): Promise<void> {
-    // Get the type from the symbol
-    const recordType = getRecordType(record as unknown as BaseRecord)
-    if (!recordType) throw new Error('Record type not found - ensure records are created via createRecord')
-    
+    const type = record.type    
     const resource: JsonApiResource = {
       id: record.id,
-      type: recordType,
+      type,
       attributes: record as Record<string, unknown>,
     }
     await _fetcher.post(resource)

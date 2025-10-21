@@ -67,6 +67,8 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
 
 export interface Person {
   id: string
+  lid?: string
+  type: string
   firstName?: string
   lastName?: string
   twitter?: string
@@ -74,12 +76,16 @@ export interface Person {
 
 export interface Comment {
   id: string
+  lid?: string
+  type: string
   body?: string
   author?: Person | null
 }
 
 export interface Article {
   id: string
+  lid?: string
+  type: string
   title?: string
   author?: Person | null
   comments?: Comment[]
