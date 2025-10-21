@@ -1,5 +1,5 @@
 export type {
-  JsonApi as JsonApiStore,
+  JsonApi,
   JsonApiConfig as JsonApiStoreConfig,
   JsonApiDocument,
   JsonApiError,
@@ -10,7 +10,6 @@ export type {
   JsonApiRelationship,
   JsonApiResource,
   JsonApiResourceIdentifier,
-  JsonApiUseFunction as JsonApiStoreUseFunction,
   ModelDefinition,
   Relationship,
 } from './json-api.ts'

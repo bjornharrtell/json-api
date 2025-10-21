@@ -74,11 +74,32 @@ export interface JsonApiError {
   meta?: JsonApiMeta
 }
 
+export interface JsonApiAtomicOperation {
+  op: 'add' | 'update' | 'remove'
+  data: JsonApiResource
+}
+
+export interface JsonApiAtomicResults {
+  data: JsonApiResource[]
+  meta?: JsonApiMeta
+}
+
+export interface JsonApiAtomicDocument {
+  ['atomic:operations']?: JsonApiAtomicOperation[]
+  ['atomic:results']?: JsonApiAtomicResults
+  errors?: JsonApiError[]
+}
+
 /**
  * Type-safe helper to set a relationship on a record
  */
 function setRelationship(record: BaseRecord, name: string, value: unknown): void {
   (record as Record<string, unknown>)[name] = value
+}
+
+export interface AtomicOperation {
+  op: 'add' | 'update' | 'remove'
+  record: BaseEntity
 }
 
 export interface BaseEntity {
@@ -138,53 +159,23 @@ export interface Relationship {
   relationshipType: RelationshipType
 }
 
-export interface JsonApi {
-  /**
-   * Find all records of a given type
-   * @returns the JSON API document that was fetched and the records that were found
-   */
-  findAll<T extends BaseEntity>(
-    type: string,
-    options?: FetchOptions,
-    params?: FetchParams,
-  ): Promise<{ doc: JsonApiDocument; records: T[] }>
-
-  /**
-   * Find a single record by id
-   * @returns the record that was found
-   */
-  findRecord<T extends BaseEntity>(
-    type: string,
-    id: string,
-    options?: FetchOptions,
-    params?: FetchParams,
-  ): Promise<T>
-
-  /**
-   * Find related records for a given record and relationship name
-   * @returns the JSON API document that was fetched
-   */
-  findRelated<T extends BaseEntity>(
-    record: T, 
-    relationshipName: string, 
-    options?: FetchOptions, 
-    params?: FetchParams
-  ): Promise<JsonApiDocument>
-
-  /**
-   * Create a new record instance
-   */
-  createRecord<T extends BaseEntity>(type: string, properties: Partial<T> & { id?: string }): T
-
-  /**
-   * Save a record
-   */
-  saveRecord<T extends BaseEntity>(record: T): Promise<void>
+function serialize(record: BaseRecord): JsonApiResource {
+  const resource: JsonApiResource = {
+    id: record.id,
+    type: record.type,
+    attributes: {},
+  }
+  for (const [key, value] of Object.entries(record)) {
+    if (key !== 'id' && key !== 'type' && value !== undefined) {
+      resource.attributes[key] = value
+    }
+  }
+  return resource
 }
 
-export type JsonApiUseFunction = () => JsonApi
+export type JsonApi = ReturnType<typeof useJsonApi>
 
-export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): JsonApi {
+export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   const _fetcher = fetcher ?? new JsonApiFetcherImpl(config.endpoint)
 
   // Map type names to their definitions
@@ -225,7 +216,6 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
   }
 
   function resourcesToRecords<T extends BaseEntity>(
-    type: string,
     resources: JsonApiResource[],
     included?: JsonApiResource[],
   ): T[] {
@@ -243,7 +233,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
 
     // Create records for main resources
     const records = resources.map(resource => 
-      createRecord<T>(type, {
+      createRecord<T>(resource.type, {
         id: resource.id,
         ...(resource.attributes as Partial<T>),
       })
@@ -299,7 +289,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
   ): Promise<{ doc: JsonApiDocument; records: T[] }> {
     const doc = await _fetcher.fetchDocument(type, undefined, options, params)
     const resources = doc.data as JsonApiResource[]
-    const records = resourcesToRecords<T>(type, resources, doc.included)
+    const records = resourcesToRecords<T>(resources, doc.included)
     return { doc, records }
   }
 
@@ -311,7 +301,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
   ): Promise<T> {
     const doc = await _fetcher.fetchDocument(type, id, options, params)
     const resource = doc.data as JsonApiResource
-    const records = resourcesToRecords<T>(type, [resource], doc.included)
+    const records = resourcesToRecords<T>([resource], doc.included)
     const record = records[0]
     if (!record) throw new Error(`Record with id ${id} not found`)
     return record
@@ -358,14 +348,22 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     return doc
   }
 
-  async function saveRecord<T extends BaseEntity>(record: T, options?: FetchOptions): Promise<void> {
+  async function saveRecord<T extends BaseEntity>(record: T, options?: FetchOptions): Promise<T> {
     const type = record.type    
-    const resource: JsonApiResource = {
-      id: record.id,
-      type,
-      attributes: record as Record<string, unknown>,
+    const resource = serialize(record as unknown as BaseRecord)
+    const doc = await _fetcher.post(resource, options)
+    const records = resourcesToRecords<T>(doc.data as JsonApiResource[])
+    return records[0] as T
+  }
+
+  async function saveAtomic(operations: AtomicOperation[], options?: FetchOptions): Promise<{ doc: JsonApiDocument; records: BaseEntity[] }> {
+    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.record as unknown as BaseRecord) } as JsonApiAtomicOperation))
+    const atomicDoc: JsonApiAtomicDocument = {
+      ['atomic:operations']: atomicOperations,
     }
-    await _fetcher.post(resource, options)
+    const doc = await _fetcher.postAtomic(atomicDoc, options)
+    const records = resourcesToRecords(doc.data)
+    return { doc, records }
   }
 
   return {
@@ -374,5 +372,6 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher): Jso
     findRelated,
     createRecord,
     saveRecord,
+    saveAtomic,
   }
 }

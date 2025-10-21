@@ -1,9 +1,10 @@
-import type { JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
+import type { JsonApiAtomicDocument, JsonApiAtomicResults, JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
 import { type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
-import type { JsonApiFetcher } from '../json-api-fetcher.ts'
+import type { FetchOptions, FetchParams, JsonApiFetcher, Options } from '../json-api-fetcher.ts'
 import doc from './articles.json'
 
 export class JsonApiFetcherArticles implements JsonApiFetcher {
+  endpoint: string = 'http://localhost:3000'
   doc: JsonApiDocument
   articles: JsonApiResource[]
   included: JsonApiResource[]
@@ -11,6 +12,12 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
     this.doc = doc as JsonApiDocument
     this.articles = this.doc.data as JsonApiResource[]
     this.included = this.doc.included as JsonApiResource[]
+  }
+  createOptions(options?: FetchOptions, params?: FetchParams, body?: BodyInit): Options {
+    throw new Error('Method not implemented.')
+  }
+  postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions): Promise<JsonApiAtomicResults> {
+    throw new Error('Method not implemented.')
   }
   async fetchDocument(_type: string, id?: string): Promise<JsonApiDocument> {
     if (id) {
