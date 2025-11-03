@@ -79,14 +79,14 @@ export interface JsonApiAtomicOperation {
   data: JsonApiResource
 }
 
-export interface JsonApiAtomicResults {
-  data: JsonApiResource[]
+export interface JsonApiAtomicResult {
+  data: JsonApiResource
   meta?: JsonApiMeta
 }
 
 export interface JsonApiAtomicDocument {
   ['atomic:operations']?: JsonApiAtomicOperation[]
-  ['atomic:results']?: JsonApiAtomicResults
+  ['atomic:results']?: JsonApiAtomicResult[]
   errors?: JsonApiError[]
 }
 
@@ -146,7 +146,7 @@ export interface Relationship {
 }
 
 function setRelationship(record: BaseEntity, name: string, value: unknown): void {
-  (record as unknown as Record<string, unknown>)[name] = value
+  ;(record as unknown as Record<string, unknown>)[name] = value
 }
 
 export type JsonApi = ReturnType<typeof useJsonApi>
@@ -160,8 +160,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   for (const modelDef of config.modelDefinitions) {
     modelDefinitions.set(modelDef.type, modelDef)
-    if (modelDef.relationships)
-      relationshipDefinitions.set(modelDef.type, modelDef.relationships)
+    if (modelDef.relationships) relationshipDefinitions.set(modelDef.type, modelDef.relationships)
   }
 
   function normalize(str: string) {
@@ -176,14 +175,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   }
 
   function serialize(record: BaseEntity): JsonApiResource {
-    const relationships = relationshipDefinitions.get(record.type) 
+    const relationships = relationshipDefinitions.get(record.type)
     const resource: JsonApiResource = serializeRid(record) as JsonApiResource
     resource.attributes = {}
-    if (relationships)
-      resource.relationships = {}
+    if (relationships) resource.relationships = {}
     for (const [key, value] of Object.entries(record)) {
-      if (key === 'id' || key === 'lid' || key === 'type' || value === undefined)
-        continue
+      if (key === 'id' || key === 'lid' || key === 'type' || value === undefined) continue
       if (relationships && key in relationships) {
         const rel = relationships[key]
         if (rel.relationshipType === RelationshipType.HasMany) {
@@ -213,23 +210,19 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     const id = properties.id ?? crypto.randomUUID()
 
     const record = { id, type, ...properties } as T
-    
+
     // Normalize property keys if needed
     if (config.kebabCase) {
       const normalizedRecord = { id, type } as BaseEntity & Record<string, unknown>
       for (const [key, value] of Object.entries(properties))
-        if (key !== 'id' && value !== undefined)
-          normalizedRecord[normalize(key)] = value
+        if (key !== 'id' && value !== undefined) normalizedRecord[normalize(key)] = value
       return normalizedRecord as T
     }
-    
+
     return record as T
   }
 
-  function resourcesToRecords<T extends BaseEntity>(
-    resources: JsonApiResource[],
-    included?: JsonApiResource[],
-  ): T[] {
+  function resourcesToRecords<T extends BaseEntity>(resources: JsonApiResource[], included?: JsonApiResource[]): T[] {
     // Create records for included resources - use type -> id map structure to avoid collisions
     const includedMap = new Map<string, Map<string, BaseEntity>>()
     if (included) {
@@ -238,29 +231,27 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
           id: resource.id,
           ...resource.attributes,
         })
-        if (!includedMap.has(resource.type)) 
-          includedMap.set(resource.type, new Map())
+        if (!includedMap.has(resource.type)) includedMap.set(resource.type, new Map())
         includedMap.get(resource.type)!.set(resource.id!, record)
       }
     }
 
     // Create records for main resources
-    const records = resources.map(resource => 
+    const records = resources.map((resource) =>
       createRecord<T>(resource.type, {
         id: resource.id,
         ...(resource.attributes as Partial<T>),
-      })
+      }),
     )
 
     const recordsMap = new Map<string, BaseEntity>()
-    for (const record of records)
-      recordsMap.set(record.id!, record)
+    for (const record of records) recordsMap.set(record.id!, record)
 
     // Populate relationships
     function populateRelationships(resource: JsonApiResource) {
       const record = recordsMap.get(resource.id!) ?? includedMap.get(resource.type)?.get(resource.id!)
       if (!record) throw new Error('Unexpected not found record')
-      
+
       if (!resource.relationships) return
 
       const rels = relationshipDefinitions.get(resource.type)
@@ -271,18 +262,21 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         const rel = rels[normalizedName]
         if (!rel) continue // Ignore undefined relationships
 
-        const rids = rel.relationshipType === RelationshipType.HasMany
-          ? (reldoc.data as JsonApiResourceIdentifier[])
-          : [reldoc.data as JsonApiResourceIdentifier]
+        const rids =
+          rel.relationshipType === RelationshipType.HasMany
+            ? (reldoc.data as JsonApiResourceIdentifier[])
+            : [reldoc.data as JsonApiResourceIdentifier]
 
         const relatedRecords = rids
-          .filter(d => d && d.type === rel.type)
-          .map(d => includedMap.get(d.type)?.get(d.id!) || recordsMap.get(d.id!))
+          .filter((d) => d && d.type === rel.type)
+          .map((d) => includedMap.get(d.type)?.get(d.id!) || recordsMap.get(d.id!))
           .filter(Boolean)
 
-        setRelationship(record, normalizedName, rel.relationshipType === RelationshipType.HasMany 
-          ? relatedRecords 
-          : relatedRecords[0])
+        setRelationship(
+          record,
+          normalizedName,
+          rel.relationshipType === RelationshipType.HasMany ? relatedRecords : relatedRecords[0],
+        )
       }
     }
 
@@ -328,7 +322,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     const type = record.type
     const rels = relationshipDefinitions.get(type)
     if (!rels) throw new Error(`Model ${type} has no relationships`)
-    
+
     const rel = rels[relationshipName]
     if (!rel) throw new Error(`Relationship ${relationshipName} not defined`)
 
@@ -344,19 +338,24 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     }
 
     const doc = await _fetcher.fetchHasMany(type, record.id!, relationshipName, options, params)
-    const related = rel.relationshipType === RelationshipType.HasMany
-      ? (doc.data as JsonApiResource[])
-      : [doc.data as JsonApiResource]
-    
-    const relatedRecords = related.map(r => createRecord(rel.type, {
-      id: r.id,
-      ...r.attributes,
-    }))
-    
-    setRelationship(record, relationshipName, rel.relationshipType === RelationshipType.HasMany 
-      ? relatedRecords 
-      : relatedRecords[0])
-    
+    const related =
+      rel.relationshipType === RelationshipType.HasMany
+        ? (doc.data as JsonApiResource[])
+        : [doc.data as JsonApiResource]
+
+    const relatedRecords = related.map((r) =>
+      createRecord(rel.type, {
+        id: r.id,
+        ...r.attributes,
+      }),
+    )
+
+    setRelationship(
+      record,
+      relationshipName,
+      rel.relationshipType === RelationshipType.HasMany ? relatedRecords : relatedRecords[0],
+    )
+
     return doc
   }
 
@@ -367,13 +366,17 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return records[0] as T
   }
 
-  async function saveAtomic(operations: AtomicOperation[], options?: FetchOptions): Promise<{ doc: JsonApiAtomicResults; records: BaseEntity[] }> {
-    const atomicOperations = operations.map(op => ({ op: op.op, data: serialize(op.data) } as JsonApiAtomicOperation))
+  async function saveAtomic(
+    operations: AtomicOperation[],
+    options?: FetchOptions,
+  ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
+    const atomicOperations = operations.map((op) => ({ op: op.op, data: serialize(op.data) }) as JsonApiAtomicOperation)
     const atomicDoc: JsonApiAtomicDocument = {
       ['atomic:operations']: atomicOperations,
     }
     const doc = await _fetcher.postAtomic(atomicDoc, options)
-    const records = resourcesToRecords(doc.data)
+    if (!doc) return
+    const records = resourcesToRecords(doc['atomic:results']!.map((r) => r.data))
     return { doc, records }
   }
 
