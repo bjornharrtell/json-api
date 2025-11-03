@@ -230,15 +230,17 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     resources: JsonApiResource[],
     included?: JsonApiResource[],
   ): T[] {
-    // Create records for included resources
-    const includedMap = new Map<string, BaseEntity>()
+    // Create records for included resources - use type -> id map structure to avoid collisions
+    const includedMap = new Map<string, Map<string, BaseEntity>>()
     if (included) {
       for (const resource of included) {
         const record = createRecord<BaseEntity>(resource.type, {
           id: resource.id,
           ...resource.attributes,
         })
-        includedMap.set(resource.id!, record)
+        if (!includedMap.has(resource.type)) 
+          includedMap.set(resource.type, new Map())
+        includedMap.get(resource.type)!.set(resource.id!, record)
       }
     }
 
@@ -256,7 +258,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
     // Populate relationships
     function populateRelationships(resource: JsonApiResource) {
-      const record = recordsMap.get(resource.id!) ?? includedMap.get(resource.id!)
+      const record = recordsMap.get(resource.id!) ?? includedMap.get(resource.type)?.get(resource.id!)
       if (!record) throw new Error('Unexpected not found record')
       
       if (!resource.relationships) return
@@ -275,7 +277,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
         const relatedRecords = rids
           .filter(d => d && d.type === rel.type)
-          .map(d => includedMap.get(d.id!) || recordsMap.get(d.id!))
+          .map(d => includedMap.get(d.type)?.get(d.id!) || recordsMap.get(d.id!))
           .filter(Boolean)
 
         setRelationship(record, normalizedName, rel.relationshipType === RelationshipType.HasMany 

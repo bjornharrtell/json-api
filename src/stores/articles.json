@@ -41,8 +41,30 @@
         "lastName": "Gebhardt",
         "twitter": "dgeb"
       },
+      "relationships": {
+        "comments": {
+          "data": [{ "type": "comments", "id": "12" }]
+        }
+      },
       "links": {
         "self": "http://example.com/people/9"
+      }
+    },
+    {
+      "type": "people",
+      "id": "2",
+      "attributes": {
+        "firstName": "Jane",
+        "lastName": "Doe",
+        "twitter": "janedoe"
+      },
+      "relationships": {
+        "comments": {
+          "data": [{ "type": "comments", "id": "5" }]
+        }
+      },
+      "links": {
+        "self": "http://example.com/people/2"
       }
     },
     {

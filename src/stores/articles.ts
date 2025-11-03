@@ -83,6 +83,7 @@ export interface Person {
   firstName?: string
   lastName?: string
   twitter?: string
+  comments?: Comment[]
 }
 
 export interface Comment {
@@ -105,6 +106,9 @@ export interface Article {
 const modelDefinitions: ModelDefinition[] = [
   {
     type: 'people',
+    relationships: {
+      comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+    },
   },
   {
     type: 'comments',
