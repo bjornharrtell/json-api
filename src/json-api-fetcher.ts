@@ -1,4 +1,4 @@
-import type { JsonApiAtomicDocument, JsonApiAtomicOperation, JsonApiAtomicResults, JsonApiDocument, JsonApiResource } from './json-api.ts'
+import type { JsonApiAtomicDocument, JsonApiDocument, JsonApiResource } from './json-api.ts'
 
 function resolvePath(...segments: string[]): string {
   return new URL(segments.join('/')).href
@@ -15,6 +15,7 @@ export interface FetchOptions {
   include?: string[]
   filter?: string
   headers?: HeadersInit
+  body?: BodyInit
   signal?: AbortSignal
 }
 
@@ -23,7 +24,7 @@ export interface FetchParams {
 }
 
 export interface Options {
-  searchParams: URLSearchParams
+  searchParams?: URLSearchParams
   headers: Headers
   method?: string
   body?: BodyInit
@@ -45,13 +46,31 @@ async function req(url: string, options: Options) {
   return data
 }
 
+async function postAtomic(url: string, options: FetchOptions) {
+  const { signal, body } = options
+  const method = 'POST'
+  const headers = new Headers(options.headers ?? {})
+  headers.append('Accept', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
+  headers.append('Content-Type', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
+  const response = await fetch(url, {
+    method,
+    headers,
+    signal,
+    body,
+  })
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
+  if (response.status === 204) return
+  const data = (await response.json()) as JsonApiAtomicDocument
+  return data
+}
+
 export type JsonApiFetcher = InstanceType<typeof JsonApiFetcherImpl>
 
 export class JsonApiFetcherImpl implements JsonApiFetcher {
   constructor(public endpoint: string) {}
   createOptions(options: FetchOptions = {}, params: FetchParams = {}, body?: BodyInit): Options {
     const searchParams = new URLSearchParams()
-    const headers = new Headers(options.headers)
+    const headers = new Headers(options.headers ?? {})
     headers.append('Accept', 'application/vnd.api+json')
     const requestOptions = { searchParams, headers, body }
     if (options.fields)
@@ -101,17 +120,14 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const newOptions = this.createOptions(options, {}, body)
     newOptions.method = 'POST'
     newOptions.headers.set('Content-Type', 'application/vnd.api+json')
-    const doc = await req(url, newOptions) as JsonApiDocument
+    const doc = (await req(url, newOptions)) as JsonApiDocument
     return doc
   }
   async postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions) {
     const url = new URL([this.endpoint, 'operations'].join('/')).href
-    const body = JSON.stringify(doc)
-    const newOptions = this.createOptions(options, {}, body)
-    newOptions.method = 'POST'
-    newOptions.headers.set('Accept', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
-    newOptions.headers.set('Content-Type', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
-    const results = await req(url, newOptions) as JsonApiAtomicResults
+    options = options || {}
+    options.body = JSON.stringify(doc)
+    const results = await postAtomic(url, options)
     return results
   }
 }

@@ -12,7 +12,7 @@ export type {
   JsonApiResourceIdentifier,
   JsonApiAtomicDocument,
   JsonApiAtomicOperation,
-  JsonApiAtomicResults,
+  JsonApiAtomicResult,
   ModelDefinition,
   Relationship,
 } from './json-api.ts'

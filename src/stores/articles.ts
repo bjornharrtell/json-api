@@ -1,4 +1,4 @@
-import type { JsonApiAtomicDocument, JsonApiAtomicResults, JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
+import type { JsonApiAtomicDocument, JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
 import { type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
 import type { FetchOptions, FetchParams, JsonApiFetcher, Options } from '../json-api-fetcher.ts'
 import doc from './articles.json'
@@ -16,10 +16,8 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   createOptions(options?: FetchOptions, params?: FetchParams, body?: BodyInit): Options {
     throw new Error('Method not implemented.')
   }
-  async postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions): Promise<JsonApiAtomicResults> {
-    return {
-      data: doc['atomic:operations']!.map(op => op.data)
-    }
+  async postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions): Promise<JsonApiAtomicDocument> {
+    return { ['atomic:results']: doc['atomic:operations']!.map((op) => ({ data: op.data })) }
   }
   async fetchDocument(_type: string, id?: string): Promise<JsonApiDocument> {
     if (id) {
@@ -71,7 +69,7 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   }
   async post(data: JsonApiResource): Promise<JsonApiDocument> {
     return {
-      data
+      data,
     }
   }
 }
