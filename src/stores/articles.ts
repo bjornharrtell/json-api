@@ -9,7 +9,7 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   articles: JsonApiResource[]
   included: JsonApiResource[]
   constructor() {
-    this.doc = doc as JsonApiDocument
+    this.doc = doc as unknown as JsonApiDocument
     this.articles = this.doc.data as JsonApiResource[]
     this.included = this.doc.included as JsonApiResource[]
   }
