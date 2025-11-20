@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { type Article, articlesJsonApi, Person } from '../src/stores/articles.ts'
-import { AtomicOperation, JsonApiResourceIdentifier } from '../src/json-api.ts'
+import { AtomicOperation } from '../src/json-api.ts'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
@@ -20,7 +20,7 @@ describe('JsonApiStore', () => {
     const { records: articles } = await articlesJsonApi.findAll<Article>('articles', {
       include: ['comments', 'author'],
     })
-    expect(articles.length).toBe(1)
+    expect(articles.length).toBe(2)
     const article = articles[0]
     expect(article.id).toBe('1')
     expect(article.title).toBe('JSON:API paints my bikeshed!')
@@ -76,7 +76,7 @@ describe('JsonApiStore', () => {
       include: ['comments', 'author', 'comments.author', 'comments.author.comments'],
     })
 
-    const article = articles[0]
+    const article = articles.find(a => a.id === '1')!
     expect(article.comments?.length).toBe(2)
 
     // Check the first comment and its author
@@ -114,12 +114,23 @@ describe('JsonApiStore', () => {
       include: ['author', 'comments'],
     })
 
-    const article = articles[0]
+    const article = articles.find(a => a.id === '1')!
 
     // Verify relationships are correctly typed
     expect(article.author?.type).toBe('people')
     expect(article.author?.firstName).toBe('Dan')
     expect(article.comments?.[0]?.type).toBe('comments')
     expect(article.comments?.[0]?.body).toBe('First!')
+  })
+
+  test('bug: relationships with only links (no data)', async () => {
+    // This test exposes a bug where the parser doesn't handle JSON:API payloads
+    // with relationship objects that only contain links (without data property).
+    const { records: articles } = await articlesJsonApi.findAll<Article>('articles')
+    const article = articles.find(a => a.id === '2')
+    expect(article?.title).toBe('Article with links-only relationships')
+    // Relationships with only links should not be populated
+    expect(article?.author).toBeUndefined()
+    expect(article?.comments).toBeUndefined()
   })
 })

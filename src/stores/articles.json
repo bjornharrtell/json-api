@@ -30,6 +30,25 @@
       "links": {
         "self": "http://example.com/articles/1"
       }
+    },
+    {
+      "type": "articles",
+      "id": "2",
+      "attributes": {
+        "title": "Article with links-only relationships"
+      },
+      "relationships": {
+        "author": {
+          "links": {
+            "related": "http://example.com/articles/2/author"
+          }
+        },
+        "comments": {
+          "links": {
+            "related": "http://example.com/articles/2/comments"
+          }
+        }
+      }
     }
   ],
   "included": [
