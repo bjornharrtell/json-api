@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { type Article, articlesJsonApi, Person } from '../src/stores/articles.ts'
-import { AtomicOperation } from '../src/json-api.ts'
+import type { AtomicOperation } from '../src/json-api.ts'
+import { type Article, articlesJsonApi, type Person } from '../src/stores/articles.ts'
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
@@ -76,7 +76,9 @@ describe('JsonApiStore', () => {
       include: ['comments', 'author', 'comments.author', 'comments.author.comments'],
     })
 
-    const article = articles.find(a => a.id === '1')!
+    const article = articles.find((a) => a.id === '1')
+    if (!article) throw new Error('Article with ID 1 not found')
+
     expect(article.comments?.length).toBe(2)
 
     // Check the first comment and its author
@@ -114,7 +116,8 @@ describe('JsonApiStore', () => {
       include: ['author', 'comments'],
     })
 
-    const article = articles.find(a => a.id === '1')!
+    const article = articles.find((a) => a.id === '1')
+    if (!article) throw new Error('Article with ID 1 not found')
 
     // Verify relationships are correctly typed
     expect(article.author?.type).toBe('people')
@@ -127,7 +130,7 @@ describe('JsonApiStore', () => {
     // This test exposes a bug where the parser doesn't handle JSON:API payloads
     // with relationship objects that only contain links (without data property).
     const { records: articles } = await articlesJsonApi.findAll<Article>('articles')
-    const article = articles.find(a => a.id === '2')
+    const article = articles.find((a) => a.id === '2')
     expect(article?.title).toBe('Article with links-only relationships')
     // Relationships with only links should not be populated
     expect(article?.author).toBeUndefined()

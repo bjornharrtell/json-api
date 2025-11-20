@@ -123,9 +123,8 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const doc = (await req(url, newOptions)) as JsonApiDocument
     return doc
   }
-  async postAtomic(doc: JsonApiAtomicDocument, options?: FetchOptions) {
+  async postAtomic(doc: JsonApiAtomicDocument, options: FetchOptions = {}) {
     const url = new URL([this.endpoint, 'operations'].join('/')).href
-    options = options || {}
     options.body = JSON.stringify(doc)
     const results = await postAtomic(url, options)
     return results
