@@ -65,6 +65,10 @@ export interface JsonApiDocument {
   meta?: JsonApiMeta
 }
 
+export interface JsonApiReference extends JsonApiResourceIdentifier {
+  relationship?: string
+}
+
 export interface JsonApiError {
   id: string
   status: string
@@ -76,7 +80,8 @@ export interface JsonApiError {
 
 export interface JsonApiAtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data: JsonApiResource
+  data?: JsonApiResource
+  ref?: JsonApiReference
 }
 
 export interface JsonApiAtomicResult {
