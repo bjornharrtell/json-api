@@ -17,7 +17,7 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
     throw new Error('Method not implemented.')
   }
   async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument> {
-    return { 'atomic:results': doc['atomic:operations']?.map((op) => ({ data: op.data })) }
+    return { 'atomic:results': doc['atomic:operations']?.map((op) => ({ data: op.data! })) }
   }
   async fetchDocument(_type: string, id?: string): Promise<JsonApiDocument> {
     if (id) {
