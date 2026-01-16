@@ -80,7 +80,7 @@ export interface JsonApiError {
 
 export interface JsonApiAtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data?: JsonApiResource
+  data?: JsonApiResource | JsonApiResourceIdentifier[]
   ref?: JsonApiReference
 }
 
