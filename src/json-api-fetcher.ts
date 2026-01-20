@@ -32,7 +32,11 @@ export interface Options {
 }
 
 class HttpError extends Error {
-  constructor(message: string, public status: number, public document?: JsonApiDocument) {
+  constructor(
+    message: string,
+    public status: number,
+    public document?: JsonApiDocument,
+  ) {
     super(message)
     this.name = 'HttpError'
   }
@@ -41,7 +45,7 @@ class HttpError extends Error {
 async function tryError(response: Response) {
   if (response.ok) return
   let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`
-  let errorDocument: JsonApiDocument | undefined = undefined
+  let errorDocument: JsonApiDocument | undefined
   try {
     errorDocument = (await response.json()) as JsonApiDocument
     if (errorDocument.errors && errorDocument.errors.length > 0) {
