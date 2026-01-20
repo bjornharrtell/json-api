@@ -31,6 +31,29 @@ export interface Options {
   signal?: AbortSignal
 }
 
+class HttpError extends Error {
+  constructor(message: string, public status: number, public document?: JsonApiDocument) {
+    super(message)
+    this.name = 'HttpError'
+  }
+}
+
+async function tryError(response: Response) {
+  if (response.ok) return
+  let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`
+  let errorDocument: JsonApiDocument | undefined = undefined
+  try {
+    errorDocument = (await response.json()) as JsonApiDocument
+    if (errorDocument.errors && errorDocument.errors.length > 0) {
+      const firstError = errorDocument.errors[0]
+      errorMessage += ` - ${firstError.title}: ${firstError.detail ?? ''}`
+    }
+  } catch {
+    // Ignore JSON parsing errors
+  }
+  throw new HttpError(errorMessage, response.status, errorDocument)
+}
+
 async function req(url: string, options: Options) {
   const { headers, searchParams, method, signal, body } = options
   const textSearchParams = searchParams ? `?${searchParams}` : ''
@@ -41,7 +64,7 @@ async function req(url: string, options: Options) {
     signal,
     body,
   })
-  if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
+  tryError(response)
   const data = (await response.json()) as JsonApiDocument
   return data
 }
@@ -58,7 +81,7 @@ async function postAtomic(url: string, options: FetchOptions) {
     signal,
     body,
   })
-  if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`)
+  tryError(response)
   if (response.status === 204) return
   const data = (await response.json()) as JsonApiAtomicDocument
   return data
