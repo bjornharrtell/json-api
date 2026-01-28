@@ -97,7 +97,8 @@ export interface JsonApiAtomicDocument {
 
 export interface AtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data: BaseEntity
+  data?: BaseEntity
+  ref?: JsonApiReference
 }
 
 export interface BaseEntity {
@@ -373,7 +374,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     operations: AtomicOperation[],
     options?: FetchOptions,
   ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
-    const atomicOperations = operations.map((op) => ({ op: op.op, data: serialize(op.data) }) as JsonApiAtomicOperation)
+    const atomicOperations = operations.map((op) => {
+      const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
+      if (op.data) jsonApiOp.data = serialize(op.data)
+      if (op.ref) jsonApiOp.ref = op.ref
+      return jsonApiOp
+    })
     const atomicDoc: JsonApiAtomicDocument = {
       'atomic:operations': atomicOperations,
     }

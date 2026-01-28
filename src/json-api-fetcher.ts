@@ -61,7 +61,8 @@ async function req(url: string, options: Options) {
     body,
   })
   const responseBody = await tryJson(response)
-  if (!response.ok) throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
+  if (!response.ok)
+    throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
   const data = responseBody as JsonApiDocument
   return data
 }
@@ -79,7 +80,8 @@ async function postAtomic(url: string, options: FetchOptions) {
     body,
   })
   const responseBody = await tryJson(response)
-  if (!response.ok) throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
+  if (!response.ok)
+    throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
   if (response.status === 204) return
   const data = responseBody as JsonApiAtomicDocument
   return data
@@ -141,7 +143,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const newOptions = this.createOptions(options, {}, body)
     newOptions.method = 'POST'
     newOptions.headers.set('Content-Type', 'application/vnd.api+json')
-    const doc = (await req(url, newOptions)) as JsonApiDocument
+    const doc = await req(url, newOptions)
     return doc
   }
   async postAtomic(doc: JsonApiAtomicDocument, options: FetchOptions = {}) {

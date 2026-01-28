@@ -136,4 +136,19 @@ describe('JsonApiStore', () => {
     expect(article?.author).toBeUndefined()
     expect(article?.comments).toBeUndefined()
   })
+
+  test('atomic remove operation with ref', async () => {
+    const removeOperations: AtomicOperation[] = [
+      {
+        op: 'remove',
+        ref: {
+          type: 'articles',
+          id: '1',
+          relationship: 'author',
+        },
+      },
+    ]
+
+    await articlesJsonApi.saveAtomic(removeOperations)
+  })
 })
