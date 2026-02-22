@@ -1,6 +1,6 @@
 # json-api
 
-json-api can fetch typed data models via a JSON:API endpoint into record instances.
+json-api can fetch typed data models via a JSON:API endpoint into normalised records.
 
 An instance is created with an endpoint and model definitions and the instance API provides methods `findAll`, `findRecord` to fetch record(s). Included relationships will be automatically resolved. If relationships for a record are not included they can be fetched later using `findRelated`.
 
@@ -9,22 +9,31 @@ An instance is created with an endpoint and model definitions and the instance A
 A service returning the canonical example JSON:API document at https://jsonapi.org/ can be consumed this way:
 
 ```ts
-import { useJsonApi, type BaseRecord, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
+import { useJsonApi, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
 
-export interface Person extends BaseRecord {
+export interface Person {
+  id: string
+  lid?: string
+  type: string
   firstName?: string
   lastName?: string
   twitter?: string
 }
 
-export interface Comment extends BaseRecord {
+export interface Comment {
+  id: string
+  lid?: string
+  type: string
   body?: string
-  author?: Person | null
+  author?: Person
 }
 
-export interface Article extends BaseRecord {
+export interface Article {
+  id: string
+  lid?: string
+  type: string
   title?: string
-  author?: Person | null
+  author?: Person
   comments?: Comment[]
 }
 
