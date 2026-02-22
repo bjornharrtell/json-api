@@ -19,30 +19,22 @@ public static class SeedData
         {
             FirstName = "Dan",
             LastName = "Gebhardt",
-            Twitter = "dgeb"
+            Twitter = "dgeb",
         };
 
         var jane = new Person
         {
             FirstName = "Jane",
             LastName = "Doe",
-            Twitter = "janedoe"
+            Twitter = "janedoe",
         };
 
         context.People.AddRange(dan, jane);
         context.SaveChanges();
 
-        var article1 = new Article
-        {
-            Title = "JSON:API paints my bikeshed!",
-            Author = dan
-        };
+        var article1 = new Article { Title = "JSON:API paints my bikeshed!", Author = dan };
 
-        var article2 = new Article
-        {
-            Title = "Another article",
-            Author = jane
-        };
+        var article2 = new Article { Title = "Another article", Author = jane };
 
         context.Articles.AddRange(article1, article2);
         context.SaveChanges();
@@ -51,21 +43,21 @@ public static class SeedData
         {
             Body = "First!",
             Author = jane,
-            Article = article1
+            Article = article1,
         };
 
         var comment2 = new Comment
         {
             Body = "I like XML better",
             Author = dan,
-            Article = article1
+            Article = article1,
         };
 
         var comment3 = new Comment
         {
             Body = "Great article!",
             Author = dan,
-            Article = article2
+            Article = article2,
         };
 
         context.Comments.AddRange(comment1, comment2, comment3);
