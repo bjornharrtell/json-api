@@ -1,30 +1,21 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import { type ModelDefinition, RelationshipType, useJsonApi } from '../../src/json-api.ts'
+import { type BaseEntity, type ModelDefinition, RelationshipType, useJsonApi } from '../../src/json-api.ts'
 
-interface Person {
-  id: string
-  lid?: string
-  type: string
+interface Person extends BaseEntity {
   firstName?: string
   lastName?: string
   twitter?: string
   comments?: Comment[]
 }
 
-interface Comment {
-  id: string
-  lid?: string
-  type: string
+interface Comment extends BaseEntity {
   body?: string
   author?: Person | null
 }
 
-interface Article {
-  id: string
-  lid?: string
-  type: string
+interface Article extends BaseEntity {
   title?: string
   author?: Person
   comments?: Comment[]
