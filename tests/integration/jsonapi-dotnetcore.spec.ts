@@ -201,4 +201,92 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     expect(firstComment).toBeDefined()
     expect(firstComment?.author?.firstName).toBeDefined()
   })
+
+  test('atomic operations - create person and article', async () => {
+    const newPerson: Person = {
+      id: '',
+      lid: 'temp-person-1',
+      type: 'people',
+      firstName: 'Alice',
+      lastName: 'Smith',
+      twitter: 'asmith',
+    }
+
+    const newArticle: Article = {
+      id: '',
+      lid: 'temp-article-1',
+      type: 'articles',
+      title: 'Atomic Operations Test',
+      author: newPerson,
+    }
+
+    const result = await articlesApi.saveAtomic([
+      { op: 'add', data: newPerson },
+      { op: 'add', data: newArticle },
+    ])
+
+    expect(result).toBeDefined()
+    expect(result?.records.length).toBe(2)
+    
+    const createdPerson = result?.records[0] as Person
+    expect(createdPerson.firstName).toBe('Alice')
+    expect(createdPerson.lastName).toBe('Smith')
+    expect(createdPerson.id).toBeDefined()
+    
+    const createdArticle = result?.records[1] as Article
+    expect(createdArticle.title).toBe('Atomic Operations Test')
+    expect(createdArticle.id).toBeDefined()
+  })
+
+  test('atomic operations - create article with existing author', async () => {
+    const newArticle: Article = {
+      id: '',
+      type: 'articles',
+      title: 'Another Atomic Article',
+      author: {
+        id: '1',
+        type: 'people',
+      } as Person,
+    }
+
+    const result = await articlesApi.saveAtomic([
+      { op: 'add', data: newArticle },
+    ])
+
+    expect(result).toBeDefined()
+    expect(result?.records.length).toBe(1)
+    
+    const createdArticle = result?.records[0] as Article
+    expect(createdArticle.title).toBe('Another Atomic Article')
+    expect(createdArticle.id).toBeDefined()
+  })
+
+  test('atomic operations - update article', async () => {
+    // First create an article to update
+    const newArticle: Article = {
+      id: '',
+      type: 'articles',
+      title: 'Article to Update',
+    }
+    
+    const createResult = await articlesApi.saveRecord(newArticle) as Article
+    expect(createResult.id).toBeDefined()
+    
+    // Now update it via atomic operations
+    createResult.title = 'Updated via Atomic Operations'
+    
+    const result = await articlesApi.saveAtomic([
+      { op: 'update', data: createResult },
+    ])
+
+    // Note: JsonApiDotNetCore may return 204 No Content for updates,
+    // in which case result will be undefined. This is spec-compliant behavior.
+    if (result) {
+      expect(result.records.length).toBeGreaterThanOrEqual(0)
+    }
+    
+    // Verify the update by fetching the article
+    const updatedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
+    expect(updatedArticle.title).toBe('Updated via Atomic Operations')
+  })
 })
