@@ -135,6 +135,12 @@ class MockFetcher implements JsonApiFetcher {
     }
   }
 
+  async patch(resource: JsonApiResource, _options?: FetchOptions): Promise<JsonApiDocument> {
+    return {
+      data: resource,
+    }
+  }
+
   async postAtomic(_doc: JsonApiAtomicDocument, _options?: FetchOptions): Promise<JsonApiAtomicDocument | undefined> {
     return {
       'atomic:results': [
