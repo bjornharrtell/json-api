@@ -1,5 +1,7 @@
 # json-api
 
+[![Coverage Status](https://coveralls.io/repos/github/bjornharrtell/json-api/badge.svg?branch=main)](https://coveralls.io/github/bjornharrtell/json-api?branch=main)
+
 json-api can fetch typed data models via a JSON:API endpoint into normalised records.
 
 An instance is created with an endpoint and model definitions and the instance API provides methods `findAll`, `findRecord` to fetch record(s). Included relationships will be automatically resolved. If relationships for a record are not included they can be fetched later using `findRelated`.
