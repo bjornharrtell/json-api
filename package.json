@@ -20,7 +20,7 @@
     "test:integration": "vitest run tests/integration/jsonapi-dotnetcore.spec.ts",
     "test:coverage": "vitest run --coverage",
     "test:integration:coverage": "vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts",
-    "coverage": "vitest run --coverage && vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts",
+    "coverage": "vitest run --coverage",
     "coveralls": "pnpm run coverage && cat ./coverage/lcov.info | coveralls",
     "build": "vite build",
     "preview": "vite preview",
