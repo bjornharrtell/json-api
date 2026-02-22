@@ -1,5 +1,13 @@
-import type { JsonApiAtomicDocument, JsonApiDocument, JsonApiResource, JsonApiResourceIdentifier } from '../json-api.ts'
-import { type ModelDefinition, RelationshipType, useJsonApi } from '../json-api.ts'
+import {
+  type BaseEntity,
+  type JsonApiAtomicDocument,
+  type JsonApiDocument,
+  type JsonApiResource,
+  type JsonApiResourceIdentifier,
+  type ModelDefinition,
+  RelationshipType,
+  useJsonApi,
+} from '../json-api.ts'
 import type { JsonApiFetcher, Options } from '../json-api-fetcher.ts'
 import doc from './articles.json'
 
@@ -76,28 +84,19 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
   }
 }
 
-export interface Person {
-  id: string
-  lid?: string
-  type: string
+export interface Person extends BaseEntity {
   firstName?: string
   lastName?: string
   twitter?: string
   comments?: Comment[]
 }
 
-export interface Comment {
-  id: string
-  lid?: string
-  type: string
+export interface Comment extends BaseEntity {
   body?: string
   author?: Person | null
 }
 
-export interface Article {
-  id: string
-  lid?: string
-  type: string
+export interface Article extends BaseEntity {
   title?: string
   author?: Person | null
   comments?: Comment[]

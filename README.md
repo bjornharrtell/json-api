@@ -11,29 +11,20 @@ An instance is created with an endpoint and model definitions and the instance A
 A service returning the canonical example JSON:API document at https://jsonapi.org/ can be consumed this way:
 
 ```ts
-import { useJsonApi, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
+import { useJsonApi, type BaseEntity, type ModelDefinition, RelationshipType } from '@bjornharrtell/json-api'
 
-export interface Person {
-  id: string
-  lid?: string
-  type: string
+export interface Person extends BaseEntity {
   firstName?: string
   lastName?: string
   twitter?: string
 }
 
-export interface Comment {
-  id: string
-  lid?: string
-  type: string
+export interface Comment extends BaseEntity {
   body?: string
   author?: Person
 }
 
-export interface Article {
-  id: string
-  lid?: string
-  type: string
+export interface Article extends BaseEntity {
   title?: string
   author?: Person
   comments?: Comment[]
