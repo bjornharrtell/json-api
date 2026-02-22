@@ -4,8 +4,8 @@ import { JsonApiFetcherImpl } from '../src/json-api-fetcher.ts'
 
 // Setup fetch mock
 beforeAll(() => {
-  if (!global.fetch) {
-    global.fetch = vi.fn()
+  if (!globalThis.fetch) {
+    globalThis.fetch = vi.fn()
   }
 })
 
@@ -24,7 +24,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         ],
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const result = await fetcher.fetchAll('articles')
@@ -45,7 +45,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         },
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const result = await fetcher.fetchOne('articles', '1')
@@ -66,7 +66,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         },
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const resource = {
@@ -88,7 +88,7 @@ describe('JsonApiFetcher HTTP methods', () => {
       },
       text: async () => '',
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const result = await fetcher.postAtomic({
@@ -115,7 +115,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         errors: [{ status: '404', title: 'Not Found' }],
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
 
@@ -146,13 +146,15 @@ describe('JsonApiFetcher HTTP methods', () => {
       },
     )
 
-    expect(options.searchParams.get('include')).toBe('author,comments')
-    expect(options.searchParams.get('fields[articles]')).toBe('title,body')
-    expect(options.searchParams.get('fields[people]')).toBe('name')
-    expect(options.searchParams.get('page[size]')).toBe('10')
-    expect(options.searchParams.get('page[number]')).toBe('2')
-    expect(options.searchParams.get('filter')).toBe('title eq "Test"')
-    expect(options.searchParams.get('sort')).toBe('created')
+    expect(options.searchParams).toBeDefined()
+    const searchParams = options.searchParams as URLSearchParams
+    expect(searchParams.get('include')).toBe('author,comments')
+    expect(searchParams.get('fields[articles]')).toBe('title,body')
+    expect(searchParams.get('fields[people]')).toBe('name')
+    expect(searchParams.get('page[size]')).toBe('10')
+    expect(searchParams.get('page[number]')).toBe('2')
+    expect(searchParams.get('filter')).toBe('title eq "Test"')
+    expect(searchParams.get('sort')).toBe('created')
     expect(options.headers.get('X-Custom')).toBe('value')
   })
 
@@ -170,7 +172,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         ],
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const result = await fetcher.fetchHasMany('articles', '1', 'comments')
@@ -191,7 +193,7 @@ describe('JsonApiFetcher HTTP methods', () => {
         },
       }),
     })
-    global.fetch = mockFetch
+    globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
     const result = await fetcher.fetchBelongsTo('articles', '1', 'author')
