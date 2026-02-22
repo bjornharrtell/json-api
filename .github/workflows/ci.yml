@@ -42,8 +42,11 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
-        run: pnpm test run
+      - name: Test with coverage
+        run: pnpm coverage
 
-      - name: Integration tests
-        run: pnpm test:integration
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./coverage/lcov.info
