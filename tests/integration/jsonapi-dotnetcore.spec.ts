@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
+import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { type ModelDefinition, RelationshipType, useJsonApi } from '../../src/json-api.ts'
 
 interface Person {
@@ -68,10 +68,10 @@ async function waitForServer(url: string, maxAttempts = 30): Promise<boolean> {
       if (response.ok || response.status === 404) {
         return true
       }
-    } catch (error) {
+    } catch (_error) {
       // Server not ready yet
     }
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
   }
   return false
 }
@@ -79,7 +79,7 @@ async function waitForServer(url: string, maxAttempts = 30): Promise<boolean> {
 beforeAll(async () => {
   // Start the C# server
   console.log('Starting JsonApiDotNetCore server...')
-  
+
   serverProcess = spawn('dotnet', ['run', '--project', 'tests/integration/jsonapi-server'], {
     stdio: ['ignore', 'pipe', 'pipe'],
     cwd: process.cwd(),
@@ -113,7 +113,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     const article = await articlesApi.findRecord<Article>('articles', '1', {
       include: ['comments', 'author'],
     })
-    
+
     expect(article.id).toBe('1')
     expect(article.title).toBe('JSON:API paints my bikeshed!')
     expect(article.comments?.length).toBe(2)
@@ -126,9 +126,9 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     const { records: articles } = await articlesApi.findAll<Article>('articles', {
       include: ['comments', 'author'],
     })
-    
+
     expect(articles.length).toBeGreaterThanOrEqual(1)
-    const article = articles.find(a => a.id === '1')
+    const article = articles.find((a) => a.id === '1')
     expect(article).toBeDefined()
     expect(article?.title).toBe('JSON:API paints my bikeshed!')
     expect(article?.comments?.length).toBe(2)
@@ -141,15 +141,15 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     const { records: articles } = await articlesApi.findAll<Article>('articles', {
       include: ['comments', 'author'],
     })
-    
-    const article = articles.find(a => a.id === '1')
+
+    const article = articles.find((a) => a.id === '1')
     expect(article).toBeDefined()
     expect(article?.comments?.length).toBe(2)
     expect(article?.author?.firstName).toBe('Dan')
-    
+
     const firstComment = article?.comments?.[0]
     expect(firstComment?.body).toBe('First!')
-    
+
     const secondComment = article?.comments?.[1]
     expect(secondComment?.body).toBe('I like XML better')
   })
@@ -160,8 +160,8 @@ describe('JsonApiDotNetCore Integration Tests', () => {
       type: 'articles',
       title: 'Integration Test Article',
     }
-    
-    const result = await articlesApi.saveRecord(newArticle) as Article
+
+    const result = (await articlesApi.saveRecord(newArticle)) as Article
     expect(result.id).toBeDefined()
     expect(result.title).toBe('Integration Test Article')
   })
@@ -176,8 +176,8 @@ describe('JsonApiDotNetCore Integration Tests', () => {
         type: 'people',
       } as Person,
     }
-    
-    const result = await articlesApi.saveRecord(newArticle) as Article
+
+    const result = (await articlesApi.saveRecord(newArticle)) as Article
     expect(result.id).toBeDefined()
     expect(result.title).toBe('Article with Author')
   })
@@ -185,8 +185,8 @@ describe('JsonApiDotNetCore Integration Tests', () => {
   test('fetch people resources', async () => {
     const { records: people } = await articlesApi.findAll<Person>('people')
     expect(people.length).toBeGreaterThan(0)
-    
-    const dan = people.find(p => p.firstName === 'Dan')
+
+    const dan = people.find((p) => p.firstName === 'Dan')
     expect(dan).toBeDefined()
     expect(dan?.lastName).toBe('Gebhardt')
   })
@@ -195,9 +195,9 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     const { records: comments } = await articlesApi.findAll<Comment>('comments', {
       include: ['author'],
     })
-    
+
     expect(comments.length).toBeGreaterThan(0)
-    const firstComment = comments.find(c => c.body === 'First!')
+    const firstComment = comments.find((c) => c.body === 'First!')
     expect(firstComment).toBeDefined()
     expect(firstComment?.author?.firstName).toBeDefined()
   })
@@ -227,12 +227,12 @@ describe('JsonApiDotNetCore Integration Tests', () => {
 
     expect(result).toBeDefined()
     expect(result?.records.length).toBe(2)
-    
+
     const createdPerson = result?.records[0] as Person
     expect(createdPerson.firstName).toBe('Alice')
     expect(createdPerson.lastName).toBe('Smith')
     expect(createdPerson.id).toBeDefined()
-    
+
     const createdArticle = result?.records[1] as Article
     expect(createdArticle.title).toBe('Atomic Operations Test')
     expect(createdArticle.id).toBeDefined()
@@ -249,13 +249,11 @@ describe('JsonApiDotNetCore Integration Tests', () => {
       } as Person,
     }
 
-    const result = await articlesApi.saveAtomic([
-      { op: 'add', data: newArticle },
-    ])
+    const result = await articlesApi.saveAtomic([{ op: 'add', data: newArticle }])
 
     expect(result).toBeDefined()
     expect(result?.records.length).toBe(1)
-    
+
     const createdArticle = result?.records[0] as Article
     expect(createdArticle.title).toBe('Another Atomic Article')
     expect(createdArticle.id).toBeDefined()
@@ -268,23 +266,21 @@ describe('JsonApiDotNetCore Integration Tests', () => {
       type: 'articles',
       title: 'Article to Update',
     }
-    
-    const createResult = await articlesApi.saveRecord(newArticle) as Article
+
+    const createResult = (await articlesApi.saveRecord(newArticle)) as Article
     expect(createResult.id).toBeDefined()
-    
+
     // Now update it via atomic operations
     createResult.title = 'Updated via Atomic Operations'
-    
-    const result = await articlesApi.saveAtomic([
-      { op: 'update', data: createResult },
-    ])
+
+    const result = await articlesApi.saveAtomic([{ op: 'update', data: createResult }])
 
     // Note: JsonApiDotNetCore may return 204 No Content for updates,
     // in which case result will be undefined. This is spec-compliant behavior.
     if (result) {
       expect(result.records.length).toBeGreaterThanOrEqual(0)
     }
-    
+
     // Verify the update by fetching the article
     const updatedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
     expect(updatedArticle.title).toBe('Updated via Atomic Operations')
