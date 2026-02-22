@@ -1,5 +1,6 @@
 # json-api
 
+![NPM Version](https://img.shields.io/npm/v/%40bjornharrtell%2Fjson-api)
 [![Coverage Status](https://coveralls.io/repos/github/bjornharrtell/json-api/badge.svg?branch=main)](https://coveralls.io/github/bjornharrtell/json-api?branch=main)
 
 json-api can fetch typed data models via a JSON:API endpoint into normalised records.
