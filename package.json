@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "vite",
     "test": "vitest",
+    "test:integration": "vitest run tests/integration/jsonapi-dotnetcore.spec.ts",
     "build": "vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
