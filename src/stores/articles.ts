@@ -82,6 +82,11 @@ export class JsonApiFetcherArticles implements JsonApiFetcher {
       data,
     }
   }
+  async patch(data: JsonApiResource): Promise<JsonApiDocument | undefined> {
+    return {
+      data,
+    }
+  }
 }
 
 export interface Person extends BaseEntity {

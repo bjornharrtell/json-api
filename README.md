@@ -1,10 +1,13 @@
 # json-api
 
+![NPM Version](https://img.shields.io/npm/v/%40bjornharrtell%2Fjson-api)
 [![Coverage Status](https://coveralls.io/repos/github/bjornharrtell/json-api/badge.svg?branch=main)](https://coveralls.io/github/bjornharrtell/json-api?branch=main)
 
-json-api can fetch typed data models via a JSON:API endpoint into normalised records.
+json-api can fetch typed data models via a JSON:API endpoint into normalised records and/or post or update them.
 
-An instance is created with an endpoint and model definitions and the instance API provides methods `findAll`, `findRecord` to fetch record(s). Included relationships will be automatically resolved. If relationships for a record are not included they can be fetched later using `findRelated`.
+An instance is created with an endpoint and model definitions and the instance API provides methods `findAll`, `findRecord` to fetch record(s). Included relationships will be automatically resolved. If relationships for a record are not included they can be fetched later using `findRelated`. A record can be created or updated `saveRecord`.
+
+Additionally support for the [atomic operation extension](https://jsonapi.org/ext/atomic/) exists via types and `saveAtomic`.
 
 ## Example usage
 

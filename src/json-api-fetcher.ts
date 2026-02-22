@@ -146,6 +146,33 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const doc = await req(url, newOptions)
     return doc
   }
+  async patch(resource: JsonApiResource, options?: FetchOptions) {
+    if (!resource.id) throw new Error('Resource must have an id to be patched')
+    const url = resolvePath(this.endpoint, resource.type, resource.id)
+    const patchDoc: JsonApiDocument = {
+      data: resource,
+    }
+    const body = JSON.stringify(patchDoc)
+    const headers = new Headers(options?.headers ?? {})
+    headers.set('Content-Type', 'application/vnd.api+json')
+    headers.append('Accept', 'application/vnd.api+json')
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers,
+      signal: options?.signal,
+      body,
+    })
+    const responseBody = await tryJson(response)
+    if (!response.ok)
+      throw new HttpError(
+        `HTTP error! status: ${response.status} ${response.statusText}`,
+        response.status,
+        responseBody,
+      )
+    if (response.status === 204) return
+    const doc = responseBody as JsonApiDocument
+    return doc
+  }
   async postAtomic(doc: JsonApiAtomicDocument, options: FetchOptions = {}) {
     const url = new URL([this.endpoint, 'operations'].join('/')).href
     options.body = JSON.stringify(doc)

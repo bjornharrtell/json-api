@@ -276,4 +276,28 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     const updatedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
     expect(updatedArticle.title).toBe('Updated via Atomic Operations')
   })
+
+  test('patch article', async () => {
+    // First create an article
+    const newArticle: Article = {
+      id: '',
+      type: 'articles',
+      title: 'Article to Patch',
+    }
+
+    const createResult = (await articlesApi.saveRecord(newArticle)) as Article
+    expect(createResult.id).toBeDefined()
+
+    // Now update it via PATCH (saveRecord without lid uses PATCH)
+    createResult.title = 'Updated via PATCH'
+    delete createResult.lid // Ensure lid is not set so PATCH is used
+
+    const patchResult = await articlesApi.saveRecord<Article>(createResult)
+    expect(patchResult.id).toBe(createResult.id)
+    expect(patchResult.title).toBe('Updated via PATCH')
+
+    // Verify the update by fetching the article
+    const patchedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
+    expect(patchedArticle.title).toBe('Updated via PATCH')
+  })
 })

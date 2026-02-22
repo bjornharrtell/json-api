@@ -365,7 +365,21 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   async function saveRecord<T extends BaseEntity>(record: BaseEntity, options?: FetchOptions): Promise<T> {
     const resource = serialize(record)
-    const doc = await _fetcher.post(resource, options)
+    let doc: JsonApiDocument | undefined
+
+    if (record.lid || !record.id) {
+      // Creating a new record (with local id or without id)
+      doc = await _fetcher.post(resource, options)
+    } else {
+      // Updating an existing record
+      doc = await _fetcher.patch(resource, options)
+      // If server returns 204 No Content, fetch the updated record
+      if (!doc) {
+        if (!record.id) throw new Error('Cannot refetch record without id')
+        return await findRecord<T>(record.type, record.id, options)
+      }
+    }
+
     const records = resourcesToRecords([doc.data] as JsonApiResource[])
     return records[0] as T
   }
