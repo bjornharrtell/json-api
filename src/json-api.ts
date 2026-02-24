@@ -273,7 +273,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
             ? (reldoc.data as JsonApiResourceIdentifier[])
             : [reldoc.data as JsonApiResourceIdentifier]
         const relatedRecords = rids
-          .filter((d) => d && d.type === rel.type)
+          .filter((d) => d?.type === rel.type)
           .map((d) => getRecord(includedMap, d) || getRecord(recordsMap, d))
           .filter(Boolean)
         setRelationship(
@@ -388,12 +388,17 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     operations: AtomicOperation[],
     options?: FetchOptions,
   ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
-    const atomicOperations = operations.map((op) => {
+    function toJsonApiOperation(op: AtomicOperation): JsonApiAtomicOperation {
       const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
-      if (op.data) jsonApiOp.data = serialize(op.data)
+      if (op.data) {
+        jsonApiOp.data = serialize(op.data)
+        if (op.op === 'update')
+          delete jsonApiOp.data.relationships
+      }
       if (op.ref) jsonApiOp.ref = op.ref
       return jsonApiOp
-    })
+    }
+    const atomicOperations = operations.map(toJsonApiOperation)
     const atomicDoc: JsonApiAtomicDocument = {
       'atomic:operations': atomicOperations,
     }
