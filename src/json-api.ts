@@ -392,8 +392,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
       if (op.data) {
         jsonApiOp.data = serialize(op.data)
-        if (op.op === 'update')
-          delete jsonApiOp.data.relationships
+        if (op.op === 'update') delete jsonApiOp.data.relationships
       }
       if (op.ref) jsonApiOp.ref = op.ref
       return jsonApiOp
