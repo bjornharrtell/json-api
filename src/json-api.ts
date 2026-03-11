@@ -80,7 +80,7 @@ export interface JsonApiError {
 
 export interface JsonApiAtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data?: JsonApiResource | JsonApiResourceIdentifier[]
+  data?: JsonApiResource | JsonApiResourceIdentifier | JsonApiResourceIdentifier[] | null
   ref?: JsonApiReference
 }
 
@@ -97,7 +97,7 @@ export interface JsonApiAtomicDocument {
 
 export interface AtomicOperation {
   op: 'add' | 'update' | 'remove'
-  data?: BaseEntity
+  data?: BaseEntity | JsonApiResourceIdentifier | JsonApiResourceIdentifier[] | null
   ref?: JsonApiReference
 }
 
@@ -390,9 +390,19 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
     function toJsonApiOperation(op: AtomicOperation): JsonApiAtomicOperation {
       const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
-      if (op.data) {
-        jsonApiOp.data = serialize(op.data)
-        if (op.op === 'update') delete jsonApiOp.data.relationships
+      if (op.data !== undefined) {
+        if (Array.isArray(op.data)) {
+          // To-many relationship operation: data is already an array of resource identifiers
+          jsonApiOp.data = op.data
+        } else if (op.data === null || op.ref?.relationship) {
+          // To-one relationship operation: null clears, or a single resource identifier
+          jsonApiOp.data = op.data as JsonApiResourceIdentifier | null
+        } else {
+          // Resource operation
+          const resource = serialize(op.data as BaseEntity)
+          if (op.op === 'update') delete resource.relationships
+          jsonApiOp.data = resource
+        }
       }
       if (op.ref) jsonApiOp.ref = op.ref
       return jsonApiOp

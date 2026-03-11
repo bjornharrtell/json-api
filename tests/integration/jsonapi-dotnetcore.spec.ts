@@ -277,6 +277,83 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     expect(updatedArticle.title).toBe('Updated via Atomic Operations')
   })
 
+  test('atomic operations - to-many relationship updates (add, replace, remove comments)', async () => {
+    // Create an article to work with
+    const newArticle: Article = {
+      id: '',
+      type: 'articles',
+      title: 'Article for To-Many Relationship Test',
+    }
+    const article = await articlesApi.saveRecord<Article>(newArticle)
+    expect(article.id).toBeDefined()
+
+    // Create two comments (the C# model requires article relationship, so we'll use atomic ops to add them)
+    const newComment1: Comment = {
+      id: '',
+      type: 'comments',
+      body: 'To-many test comment 1',
+    }
+    const newComment2: Comment = {
+      id: '',
+      type: 'comments',
+      body: 'To-many test comment 2',
+    }
+    const comment1 = await articlesApi.saveRecord<Comment>(newComment1)
+    const comment2 = await articlesApi.saveRecord<Comment>(newComment2)
+    expect(comment1.id).toBeDefined()
+    expect(comment2.id).toBeDefined()
+
+    // Add both comments to the article via atomic op
+    await articlesApi.saveAtomic([
+      {
+        op: 'add',
+        ref: { type: 'articles', id: article.id, relationship: 'comments' },
+        data: [
+          { type: 'comments', id: comment1.id },
+          { type: 'comments', id: comment2.id },
+        ],
+      },
+    ])
+
+    // Verify both comments are on the article
+    const articleWithComments = await articlesApi.findRecord<Article>('articles', article.id, {
+      include: ['comments'],
+    })
+    expect(articleWithComments.comments?.length).toBe(2)
+    const commentIds = articleWithComments.comments?.map((c) => c.id)
+    expect(commentIds).toContain(comment1.id)
+    expect(commentIds).toContain(comment2.id)
+
+    // Replace (update) to only have comment2
+    await articlesApi.saveAtomic([
+      {
+        op: 'update',
+        ref: { type: 'articles', id: article.id, relationship: 'comments' },
+        data: [{ type: 'comments', id: comment2.id }],
+      },
+    ])
+
+    const articleAfterReplace = await articlesApi.findRecord<Article>('articles', article.id, {
+      include: ['comments'],
+    })
+    expect(articleAfterReplace.comments?.length).toBe(1)
+    expect(articleAfterReplace.comments?.[0]?.id).toBe(comment2.id)
+
+    // Remove the remaining comment
+    await articlesApi.saveAtomic([
+      {
+        op: 'remove',
+        ref: { type: 'articles', id: article.id, relationship: 'comments' },
+        data: [{ type: 'comments', id: comment2.id }],
+      },
+    ])
+
+    const articleAfterRemove = await articlesApi.findRecord<Article>('articles', article.id, {
+      include: ['comments'],
+    })
+    expect(articleAfterRemove.comments?.length ?? 0).toBe(0)
+  })
+
   test('patch article', async () => {
     // First create an article
     const newArticle: Article = {

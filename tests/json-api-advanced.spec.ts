@@ -397,4 +397,133 @@ describe('JsonApi saveAtomic', () => {
     const result = await api.saveAtomic(operations)
     expect(result?.records).toBeDefined()
   })
+
+  test('saveAtomic add members to to-many relationship', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+          },
+        },
+        { type: 'comments' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'add',
+        ref: { type: 'articles', id: '1', relationship: 'comments' },
+        data: [
+          { type: 'comments', id: '10' },
+          { type: 'comments', id: '11' },
+        ],
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('add')
+    expect(op?.ref).toEqual({ type: 'articles', id: '1', relationship: 'comments' })
+    expect(op?.data).toEqual([
+      { type: 'comments', id: '10' },
+      { type: 'comments', id: '11' },
+    ])
+  })
+
+  test('saveAtomic replace all members of to-many relationship', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+          },
+        },
+        { type: 'comments' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'update',
+        ref: { type: 'articles', id: '1', relationship: 'comments' },
+        data: [{ type: 'comments', id: '20' }],
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('update')
+    expect(op?.ref).toEqual({ type: 'articles', id: '1', relationship: 'comments' })
+    expect(op?.data).toEqual([{ type: 'comments', id: '20' }])
+  })
+
+  test('saveAtomic remove members from to-many relationship', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+          },
+        },
+        { type: 'comments' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'remove',
+        ref: { type: 'articles', id: '1', relationship: 'comments' },
+        data: [
+          { type: 'comments', id: '10' },
+          { type: 'comments', id: '11' },
+        ],
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('remove')
+    expect(op?.ref).toEqual({ type: 'articles', id: '1', relationship: 'comments' })
+    expect(op?.data).toEqual([
+      { type: 'comments', id: '10' },
+      { type: 'comments', id: '11' },
+    ])
+  })
 })
