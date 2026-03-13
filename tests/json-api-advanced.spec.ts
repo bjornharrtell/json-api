@@ -613,7 +613,12 @@ describe('JsonApi saveAtomic', () => {
     const op = capturedDoc?.['atomic:operations']?.[0]
     expect(op?.op).toBe('update')
     expect((op?.data as { relationships?: unknown })?.relationships).toEqual({
-      comments: { data: [{ type: 'comments', id: '10' }, { type: 'comments', id: '11' }] },
+      comments: {
+        data: [
+          { type: 'comments', id: '10' },
+          { type: 'comments', id: '11' },
+        ],
+      },
     })
   })
 
