@@ -1,6 +1,9 @@
 import { type FetchOptions, type FetchParams, type JsonApiFetcher, JsonApiFetcherImpl } from './json-api-fetcher.ts'
 import { camel } from './util.ts'
 
+const ATOMIC_OPERATIONS_KEY = 'atomic:operations' as const
+const ATOMIC_RESULTS_KEY = 'atomic:results' as const
+
 export interface JsonApiResourceIdentifier {
   id?: string
   lid?: string
@@ -408,11 +411,11 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     }
     const atomicOperations = operations.map(toJsonApiOperation)
     const atomicDoc: JsonApiAtomicDocument = {
-      'atomic:operations': atomicOperations,
+      [ATOMIC_OPERATIONS_KEY]: atomicOperations,
     }
     const doc = await _fetcher.postAtomic(atomicDoc, options)
     if (!doc) return
-    const records = doc['atomic:results'] ? resourcesToRecords(doc['atomic:results'].map((r) => r.data)) : []
+    const records = doc[ATOMIC_RESULTS_KEY] ? resourcesToRecords(doc[ATOMIC_RESULTS_KEY].map((r) => r.data)) : []
     return { doc, records }
   }
 

@@ -1,5 +1,12 @@
 import type { JsonApiAtomicDocument, JsonApiDocument, JsonApiResource } from './json-api.ts'
 
+const CONTENT_TYPE_JSON_API = 'application/vnd.api+json'
+const CONTENT_TYPE_JSON_API_ATOMIC = 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"'
+const HTTP_ERROR_PREFIX = 'HTTP error! status: '
+const HEADER_ACCEPT = 'Accept'
+const HEADER_CONTENT_TYPE = 'Content-Type'
+const METHOD_POST = 'POST'
+
 function resolvePath(...segments: string[]): string {
   return new URL(segments.join('/')).href
 }
@@ -62,17 +69,17 @@ async function req(url: string, options: Options) {
   })
   const responseBody = await tryJson(response)
   if (!response.ok)
-    throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
+    throw new HttpError(`${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`, response.status, responseBody)
   const data = responseBody as JsonApiDocument
   return data
 }
 
 async function postAtomic(url: string, options: FetchOptions) {
   const { signal, body } = options
-  const method = 'POST'
+  const method = METHOD_POST
   const headers = new Headers(options.headers ?? {})
-  headers.append('Accept', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
-  headers.append('Content-Type', 'application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"')
+  headers.append(HEADER_ACCEPT, CONTENT_TYPE_JSON_API_ATOMIC)
+  headers.append(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON_API_ATOMIC)
   const response = await fetch(url, {
     method,
     headers,
@@ -81,7 +88,7 @@ async function postAtomic(url: string, options: FetchOptions) {
   })
   const responseBody = await tryJson(response)
   if (!response.ok)
-    throw new HttpError(`HTTP error! status: ${response.status} ${response.statusText}`, response.status, responseBody)
+    throw new HttpError(`${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`, response.status, responseBody)
   if (response.status === 204) return
   const data = responseBody as JsonApiAtomicDocument
   return data
@@ -94,7 +101,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
   createOptions(options: FetchOptions = {}, params: FetchParams = {}, body?: BodyInit): Options {
     const searchParams = new URLSearchParams()
     const headers = new Headers(options.headers ?? {})
-    headers.append('Accept', 'application/vnd.api+json')
+    headers.append(HEADER_ACCEPT, CONTENT_TYPE_JSON_API)
     const requestOptions = { searchParams, headers, body }
     if (options.fields)
       for (const [key, value] of Object.entries(options.fields)) searchParams.append(`fields[${key}]`, value.join(','))
@@ -141,8 +148,8 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     }
     const body = JSON.stringify(postDoc)
     const newOptions = this.createOptions(options, {}, body)
-    newOptions.method = 'POST'
-    newOptions.headers.set('Content-Type', 'application/vnd.api+json')
+    newOptions.method = METHOD_POST
+    newOptions.headers.set(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON_API)
     const doc = await req(url, newOptions)
     return doc
   }
@@ -154,8 +161,8 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     }
     const body = JSON.stringify(patchDoc)
     const headers = new Headers(options?.headers ?? {})
-    headers.set('Content-Type', 'application/vnd.api+json')
-    headers.append('Accept', 'application/vnd.api+json')
+    headers.set(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON_API)
+    headers.append(HEADER_ACCEPT, CONTENT_TYPE_JSON_API)
     const response = await fetch(url, {
       method: 'PATCH',
       headers,
@@ -165,7 +172,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const responseBody = await tryJson(response)
     if (!response.ok)
       throw new HttpError(
-        `HTTP error! status: ${response.status} ${response.statusText}`,
+        `${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`,
         response.status,
         responseBody,
       )
