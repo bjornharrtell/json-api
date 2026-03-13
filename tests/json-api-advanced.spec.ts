@@ -526,4 +526,136 @@ describe('JsonApi saveAtomic', () => {
       { type: 'comments', id: '11' },
     ])
   })
+
+  test('saveAtomic update op preserves to-one (BelongsTo) relationship in data', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+          },
+        },
+        { type: 'people' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'update',
+        data: {
+          id: '1',
+          type: 'articles',
+          title: 'Updated Title',
+          author: { id: '2', type: 'people' },
+        } as BaseEntity,
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('update')
+    expect((op?.data as { relationships?: unknown })?.relationships).toEqual({
+      author: { data: { type: 'people', id: '2' } },
+    })
+  })
+
+  test('saveAtomic update op preserves to-many (HasMany) relationship in data', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+          },
+        },
+        { type: 'comments' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'update',
+        data: {
+          id: '1',
+          type: 'articles',
+          comments: [
+            { id: '10', type: 'comments' },
+            { id: '11', type: 'comments' },
+          ],
+        } as BaseEntity,
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('update')
+    expect((op?.data as { relationships?: unknown })?.relationships).toEqual({
+      comments: { data: [{ type: 'comments', id: '10' }, { type: 'comments', id: '11' }] },
+    })
+  })
+
+  test('saveAtomic update op with no relationship fields sends no relationships', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+          },
+        },
+        { type: 'people' },
+      ],
+    }
+
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic([
+      {
+        op: 'update',
+        data: {
+          id: '1',
+          type: 'articles',
+          title: 'No Relationships Here',
+        } as BaseEntity,
+      },
+    ])
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('update')
+    // relationships key is present but empty (no rel properties set on the record)
+    expect((op?.data as { relationships?: unknown })?.relationships).toEqual({})
+  })
 })

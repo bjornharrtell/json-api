@@ -354,6 +354,36 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     expect(articleAfterRemove.comments?.length ?? 0).toBe(0)
   })
 
+  test('atomic operations - update to-one relationship via resource data member', async () => {
+    // Create an article without an author
+    const newArticle: Article = {
+      id: '',
+      type: 'articles',
+      title: 'Article Without Author',
+    }
+    const article = await articlesApi.saveRecord<Article>(newArticle)
+    expect(article.id).toBeDefined()
+
+    // Verify no author initially
+    const articleBefore = await articlesApi.findRecord<Article>('articles', article.id, {
+      include: ['author'],
+    })
+    expect(articleBefore.author).toBeUndefined()
+
+    // Update author via atomic op with relationship embedded in resource data member.
+    // Regression test for 330f939: previously the relationships were deleted from the
+    // serialized resource for update ops, causing to-one relationship updates to be silently dropped.
+    const updatedArticle: Article = { ...article, author: { id: '1', type: 'people' } as Person }
+    await articlesApi.saveAtomic([{ op: 'update', data: updatedArticle }])
+
+    // Verify author was set
+    const articleAfter = await articlesApi.findRecord<Article>('articles', article.id, {
+      include: ['author'],
+    })
+    expect(articleAfter.author?.id).toBe('1')
+    expect(articleAfter.author?.firstName).toBe('Dan')
+  })
+
   test('patch article', async () => {
     // First create an article
     const newArticle: Article = {

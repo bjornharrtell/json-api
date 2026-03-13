@@ -400,7 +400,6 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         } else {
           // Resource operation
           const resource = serialize(op.data as BaseEntity)
-          if (op.op === 'update') delete resource.relationships
           jsonApiOp.data = resource
         }
       }
