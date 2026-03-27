@@ -16,6 +16,6 @@ export type {
   ModelDefinition,
   Relationship,
 } from './json-api.ts'
-export { type AtomicOperation, type BaseEntity, RelationshipType, useJsonApi } from './json-api.ts'
+export { type SerializeOptions, type AtomicOperation, type BaseEntity, RelationshipType, useJsonApi } from './json-api.ts'
 export type { FetchOptions, FetchParams, JsonApiFetcher, PageOption } from './json-api-fetcher.ts'
 export { camel } from './util.ts'
