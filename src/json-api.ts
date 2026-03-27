@@ -105,8 +105,8 @@ export interface AtomicOperation {
 }
 
 export interface SerializeOptions {
-  /** Whether to include relationships when serializing a resource. Defaults to true. */
-  includeRelationships?: boolean
+  /** Whether to include to-many (HasMany) relationships when serializing a resource. Defaults to true. */
+  includeToManyRelationships?: boolean
 }
 
 export interface BaseEntity {
@@ -189,19 +189,21 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   }
 
   function serialize(record: BaseEntity, serializeOptions?: SerializeOptions): JsonApiResource {
-    const includeRelationships = serializeOptions?.includeRelationships !== false
+    const includeToManyRelationships = serializeOptions?.includeToManyRelationships !== false
     const relationships = relationshipDefinitions.get(record.type)
     const resource: JsonApiResource = serializeRid(record) as JsonApiResource
     resource.attributes = {}
-    if (includeRelationships && relationships) resource.relationships = {}
+    if (relationships) resource.relationships = {}
     for (const [key, value] of Object.entries(record)) {
       if (key === 'id' || key === 'lid' || key === 'type' || value === undefined) continue
-      if (includeRelationships && relationships && key in relationships && resource.relationships) {
+      if (relationships && key in relationships && resource.relationships) {
         const rel = relationships[key]
         if (rel.relationshipType === RelationshipType.HasMany) {
-          const entities = value as unknown as BaseEntity[]
-          resource.relationships[key] = {
-            data: entities.map(serializeRid),
+          if (includeToManyRelationships) {
+            const entities = value as unknown as BaseEntity[]
+            resource.relationships[key] = {
+              data: entities.map(serializeRid),
+            }
           }
         } else if (rel.relationshipType === RelationshipType.BelongsTo) {
           const entity = value as unknown as BaseEntity

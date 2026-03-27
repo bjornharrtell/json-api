@@ -665,7 +665,7 @@ describe('JsonApi saveAtomic', () => {
     expect((op?.data as { relationships?: unknown })?.relationships).toEqual({})
   })
 
-  test('saveAtomic with includeRelationships false omits relationships from resource operations', async () => {
+  test('saveAtomic with includeToManyRelationships false omits HasMany but keeps BelongsTo', async () => {
     let capturedDoc: JsonApiAtomicDocument | undefined
 
     class CapturingFetcher extends MockFetcher {
@@ -682,13 +682,15 @@ describe('JsonApi saveAtomic', () => {
           type: 'articles',
           relationships: {
             author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
           },
         },
         { type: 'people' },
+        { type: 'comments' },
       ],
     }
 
-    const serializeOptions: SerializeOptions = { includeRelationships: false }
+    const serializeOptions: SerializeOptions = { includeToManyRelationships: false }
     const api = useJsonApi(config, new CapturingFetcher())
 
     await api.saveAtomic(
@@ -700,6 +702,7 @@ describe('JsonApi saveAtomic', () => {
             type: 'articles',
             title: 'Updated Title',
             author: { id: '2', type: 'people' },
+            comments: [{ id: '10', type: 'comments' }],
           } as BaseEntity,
         },
       ],
@@ -710,6 +713,11 @@ describe('JsonApi saveAtomic', () => {
     const op = capturedDoc?.['atomic:operations']?.[0]
     expect(op?.op).toBe('update')
     expect((op?.data as JsonApiResource)?.attributes).toEqual({ title: 'Updated Title' })
-    expect((op?.data as { relationships?: unknown })?.relationships).toBeUndefined()
+    // BelongsTo (author) is still serialized
+    expect((op?.data as { relationships?: Record<string, unknown> })?.relationships).toEqual({
+      author: { data: { type: 'people', id: '2' } },
+    })
+    // HasMany (comments) is omitted
+    expect((op?.data as { relationships?: Record<string, unknown> })?.relationships?.comments).toBeUndefined()
   })
 })
