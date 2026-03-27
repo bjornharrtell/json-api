@@ -15,7 +15,7 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         topLevelVar: false,
-      }
+      },
     },
     lib: {
       entry: resolve(__dirname, 'src/lib.ts'),
