@@ -4,6 +4,7 @@ import {
   type AtomicOperation,
   type BaseEntity,
   type JsonApiConfig,
+  type SerializeOptions,
   RelationshipType,
   useJsonApi,
 } from '../src/json-api.ts'
@@ -662,5 +663,53 @@ describe('JsonApi saveAtomic', () => {
     expect(op?.op).toBe('update')
     // relationships key is present but empty (no rel properties set on the record)
     expect((op?.data as { relationships?: unknown })?.relationships).toEqual({})
+  })
+
+  test('saveAtomic with includeRelationships false omits relationships from resource operations', async () => {
+    let capturedDoc: JsonApiAtomicDocument | undefined
+
+    class CapturingFetcher extends MockFetcher {
+      override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+        capturedDoc = doc
+        return { 'atomic:results': [] }
+      }
+    }
+
+    const config: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+          },
+        },
+        { type: 'people' },
+      ],
+    }
+
+    const serializeOptions: SerializeOptions = { includeRelationships: false }
+    const api = useJsonApi(config, new CapturingFetcher())
+
+    await api.saveAtomic(
+      [
+        {
+          op: 'update',
+          data: {
+            id: '1',
+            type: 'articles',
+            title: 'Updated Title',
+            author: { id: '2', type: 'people' },
+          } as BaseEntity,
+        },
+      ],
+      undefined,
+      serializeOptions,
+    )
+
+    const op = capturedDoc?.['atomic:operations']?.[0]
+    expect(op?.op).toBe('update')
+    expect((op?.data as JsonApiResource)?.attributes).toEqual({ title: 'Updated Title' })
+    expect((op?.data as { relationships?: unknown })?.relationships).toBeUndefined()
   })
 })

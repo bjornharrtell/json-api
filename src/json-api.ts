@@ -104,6 +104,11 @@ export interface AtomicOperation {
   ref?: JsonApiReference
 }
 
+export interface SerializeOptions {
+  /** Whether to include relationships when serializing a resource. Defaults to true. */
+  includeRelationships?: boolean
+}
+
 export interface BaseEntity {
   id: string
   lid?: string
@@ -183,14 +188,15 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return config.kebabCase ? camel(str) : str
   }
 
-  function serialize(record: BaseEntity): JsonApiResource {
+  function serialize(record: BaseEntity, serializeOptions?: SerializeOptions): JsonApiResource {
+    const includeRelationships = serializeOptions?.includeRelationships !== false
     const relationships = relationshipDefinitions.get(record.type)
     const resource: JsonApiResource = serializeRid(record) as JsonApiResource
     resource.attributes = {}
-    if (relationships) resource.relationships = {}
+    if (includeRelationships && relationships) resource.relationships = {}
     for (const [key, value] of Object.entries(record)) {
       if (key === 'id' || key === 'lid' || key === 'type' || value === undefined) continue
-      if (relationships && key in relationships && resource.relationships) {
+      if (includeRelationships && relationships && key in relationships && resource.relationships) {
         const rel = relationships[key]
         if (rel.relationshipType === RelationshipType.HasMany) {
           const entities = value as unknown as BaseEntity[]
@@ -205,7 +211,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         } else {
           throw new Error(`Unknown relationship type for ${key}`)
         }
-      } else {
+      } else if (!(relationships && key in relationships)) {
         resource.attributes[key] = value
       }
     }
@@ -390,6 +396,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   async function saveAtomic(
     operations: AtomicOperation[],
     options?: FetchOptions,
+    serializeOptions?: SerializeOptions,
   ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
     function toJsonApiOperation(op: AtomicOperation): JsonApiAtomicOperation {
       const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
@@ -402,7 +409,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
           jsonApiOp.data = op.data as JsonApiResourceIdentifier | null
         } else {
           // Resource operation
-          const resource = serialize(op.data as BaseEntity)
+          const resource = serialize(op.data as BaseEntity, serializeOptions)
           jsonApiOp.data = resource
         }
       }
