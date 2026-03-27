@@ -101,7 +101,7 @@ afterAll(() => {
 
 describe('JsonApiDotNetCore Integration Tests', () => {
   test('fetch single article with includes', async () => {
-    const article = await articlesApi.findRecord<Article>('articles', '1', {
+    const { record: article } = await articlesApi.findRecord<Article>('articles', '1', {
       include: ['comments', 'author'],
     })
 
@@ -273,7 +273,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     }
 
     // Verify the update by fetching the article
-    const updatedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
+    const { record: updatedArticle } = await articlesApi.findRecord<Article>('articles', createResult.id)
     expect(updatedArticle.title).toBe('Updated via Atomic Operations')
   })
 
@@ -316,7 +316,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     ])
 
     // Verify both comments are on the article
-    const articleWithComments = await articlesApi.findRecord<Article>('articles', article.id, {
+    const { record: articleWithComments } = await articlesApi.findRecord<Article>('articles', article.id, {
       include: ['comments'],
     })
     expect(articleWithComments.comments?.length).toBe(2)
@@ -333,7 +333,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
       },
     ])
 
-    const articleAfterReplace = await articlesApi.findRecord<Article>('articles', article.id, {
+    const { record: articleAfterReplace } = await articlesApi.findRecord<Article>('articles', article.id, {
       include: ['comments'],
     })
     expect(articleAfterReplace.comments?.length).toBe(1)
@@ -348,7 +348,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
       },
     ])
 
-    const articleAfterRemove = await articlesApi.findRecord<Article>('articles', article.id, {
+    const { record: articleAfterRemove } = await articlesApi.findRecord<Article>('articles', article.id, {
       include: ['comments'],
     })
     expect(articleAfterRemove.comments?.length ?? 0).toBe(0)
@@ -365,7 +365,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     expect(article.id).toBeDefined()
 
     // Verify no author initially
-    const articleBefore = await articlesApi.findRecord<Article>('articles', article.id, {
+    const { record: articleBefore } = await articlesApi.findRecord<Article>('articles', article.id, {
       include: ['author'],
     })
     expect(articleBefore.author).toBeUndefined()
@@ -377,7 +377,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     await articlesApi.saveAtomic([{ op: 'update', data: updatedArticle }])
 
     // Verify author was set
-    const articleAfter = await articlesApi.findRecord<Article>('articles', article.id, {
+    const { record: articleAfter } = await articlesApi.findRecord<Article>('articles', article.id, {
       include: ['author'],
     })
     expect(articleAfter.author?.id).toBe('1')
@@ -404,7 +404,7 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     expect(patchResult.title).toBe('Updated via PATCH')
 
     // Verify the update by fetching the article
-    const patchedArticle = await articlesApi.findRecord<Article>('articles', createResult.id)
+    const { record: patchedArticle } = await articlesApi.findRecord<Article>('articles', createResult.id)
     expect(patchedArticle.title).toBe('Updated via PATCH')
   })
 })
