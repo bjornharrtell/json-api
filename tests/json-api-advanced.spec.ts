@@ -198,7 +198,7 @@ describe('JsonApi with kebab-case', () => {
   test('findRecord with kebab-case converts attributes', async () => {
     const fetcher = new MockFetcher()
     const api = useJsonApi(config, fetcher)
-    const user = await api.findRecord<User>('users', '1')
+    const { record: user } = await api.findRecord<User>('users', '1')
     expect(user.firstName).toBe('John')
     expect(user.lastName).toBe('Doe')
   })

@@ -4,7 +4,7 @@ import { type Article, articlesJsonApi, JsonApiFetcherArticles, type Person } fr
 
 describe('JsonApiStore', () => {
   test('single record fetch', async () => {
-    const article = await articlesJsonApi.findRecord<Article>('articles', '1', {
+    const { record: article } = await articlesJsonApi.findRecord<Article>('articles', '1', {
       include: ['comments', 'author'],
     })
     expect(article.id).toBe('1')
