@@ -311,13 +311,13 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     id: string,
     options?: FetchOptions,
     params?: FetchParams,
-  ): Promise<T> {
+  ): Promise<{ doc: JsonApiDocument; record: T }> {
     const doc = await _fetcher.fetchDocument(type, id, options, params)
     const resource = doc.data as JsonApiResource
     const records = resourcesToRecords([resource], doc.included) as T[]
     const record = records[0]
     if (!record) throw new Error(`Record with id ${id} not found`)
-    return record
+    return { doc, record }
   }
 
   async function findRelated(
@@ -379,7 +379,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       // If server returns 204 No Content, fetch the updated record
       if (!doc) {
         if (!record.id) throw new Error('Cannot refetch record without id')
-        return await findRecord<T>(record.type, record.id, options)
+        return (await findRecord<T>(record.type, record.id, options)).record
       }
     }
 
