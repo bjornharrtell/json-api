@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import { type BaseEntity, type ModelDefinition, RelationshipType, useJsonApi } from '../../src/json-api.ts'
+import { type BaseEntity, META, type ModelDefinition, RelationshipType, useJsonApi } from '../../src/json-api.ts'
 
 interface Person extends BaseEntity {
   firstName?: string
@@ -406,5 +406,11 @@ describe('JsonApiDotNetCore Integration Tests', () => {
     // Verify the update by fetching the article
     const { record: patchedArticle } = await articlesApi.findRecord<Article>('articles', createResult.id)
     expect(patchedArticle.title).toBe('Updated via PATCH')
+  })
+
+  test('article resource has resource-level meta', async () => {
+    const { record: article } = await articlesApi.findRecord<Article>('articles', '1')
+    expect(article[META]).toBeDefined()
+    expect((article[META] as Record<string, unknown>)?.copyright).toBe('MIT License')
   })
 })

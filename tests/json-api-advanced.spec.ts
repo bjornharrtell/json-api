@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vitest'
-import type { JsonApiAtomicDocument, JsonApiDocument, JsonApiResource } from '../src/json-api.ts'
 import {
   type AtomicOperation,
   type BaseEntity,
+  type JsonApiAtomicDocument,
   type JsonApiConfig,
-  type SerializeOptions,
+  type JsonApiDocument,
+  type JsonApiResource,
+  META,
   RelationshipType,
+  type SerializeOptions,
   useJsonApi,
 } from '../src/json-api.ts'
 import type { FetchOptions, FetchParams, JsonApiFetcher, Options } from '../src/json-api-fetcher.ts'
@@ -719,5 +722,113 @@ describe('JsonApi saveAtomic', () => {
     })
     // HasMany (comments) is omitted
     expect((op?.data as { relationships?: Record<string, unknown> })?.relationships?.comments).toBeUndefined()
+  })
+})
+
+function makeMetaFetcher(single: boolean): JsonApiFetcher {
+  const resource: JsonApiResource = {
+    id: '1',
+    type: 'articles',
+    attributes: { title: 'Test' },
+    meta: { copyright: 'MIT License' },
+  }
+  return {
+    async fetchDocument() {
+      return single ? { data: resource } : { data: [resource] }
+    },
+    async fetchHasMany() {
+      return { data: [] }
+    },
+    async fetchBelongsTo() {
+      return { data: null }
+    },
+    async post(r: JsonApiResource) {
+      return { data: r }
+    },
+    async patch(r: JsonApiResource) {
+      return { data: r }
+    },
+    async postAtomic() {
+      return undefined
+    },
+  } as unknown as JsonApiFetcher
+}
+
+describe('JsonApi resource meta', () => {
+  const config: JsonApiConfig = {
+    endpoint: 'https://api.example.com',
+    modelDefinitions: [
+      {
+        type: 'articles',
+        relationships: {
+          author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+        },
+      },
+      { type: 'people' },
+    ],
+  }
+
+  test('findRecord attaches resource meta under META symbol', async () => {
+    const api = useJsonApi(config, makeMetaFetcher(true))
+    const { record } = await api.findRecord('articles', '1')
+    expect(record[META]).toEqual({ copyright: 'MIT License' })
+  })
+
+  test('findAll attaches resource meta under META symbol', async () => {
+    const api = useJsonApi(config, makeMetaFetcher(false))
+    const { records } = await api.findAll('articles')
+    expect(records[0][META]).toEqual({ copyright: 'MIT License' })
+  })
+
+  test('META symbol does not clash with a literal meta attribute', async () => {
+    const resource: JsonApiResource = {
+      id: '2',
+      type: 'articles',
+      attributes: { title: 'Test', meta: 'some-value' },
+      meta: { copyright: 'MIT License' },
+    }
+    const fetcher = {
+      async fetchDocument() {
+        return { data: resource }
+      },
+    } as unknown as JsonApiFetcher
+    const api = useJsonApi(config, fetcher)
+    const { record } = await api.findRecord<BaseEntity & { meta?: unknown }>('articles', '2')
+    expect((record as { meta?: unknown }).meta).toBe('some-value')
+    expect(record[META]).toEqual({ copyright: 'MIT License' })
+  })
+
+  test('META symbol is set on included resources', async () => {
+    const fetcher = {
+      async fetchDocument(): Promise<JsonApiDocument> {
+        return {
+          data: {
+            id: '1',
+            type: 'articles',
+            attributes: { title: 'Test' },
+            meta: { copyright: 'MIT License' },
+            relationships: {
+              author: { data: { type: 'people', id: '42' } },
+            },
+          },
+          included: [
+            {
+              id: '42',
+              type: 'people',
+              attributes: { firstName: 'Dan' },
+              meta: { role: 'editor' },
+            },
+          ],
+        }
+      },
+    } as unknown as JsonApiFetcher
+    const api = useJsonApi(config, fetcher)
+    interface Article extends BaseEntity {
+      title?: string
+      author?: BaseEntity & { firstName?: string }
+    }
+    const { record } = await api.findRecord<Article>('articles', '1', { include: ['author'] })
+    expect(record[META]).toEqual({ copyright: 'MIT License' })
+    expect(record.author?.[META]).toEqual({ role: 'editor' })
   })
 })

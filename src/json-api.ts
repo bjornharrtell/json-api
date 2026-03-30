@@ -20,11 +20,13 @@ export interface JsonApiResource {
   type: string
   attributes: Record<string, unknown>
   relationships?: Record<string, JsonApiRelationship>
+  meta?: JsonApiMeta
 }
 
 export interface JsonApiMeta {
   // Pagination
   totalPages?: number
+  total?: number
   totalItems?: number
   currentPage?: number
   itemsPerPage?: number
@@ -109,10 +111,17 @@ export interface SerializeOptions {
   includeToManyRelationships?: boolean
 }
 
+/**
+ * Symbol key used to store JSON:API resource-level meta on a record, avoiding
+ * collisions with a literal "meta" attribute field.
+ */
+export const META: unique symbol = Symbol('meta')
+
 export interface BaseEntity {
   id: string
   lid?: string
   type: string
+  [META]?: JsonApiMeta
 }
 
 /**
@@ -241,10 +250,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   function resourcesToRecords(resources: JsonApiResource[], included?: JsonApiResource[]): BaseEntity[] {
     function resourceToRecord(resource: JsonApiResource): BaseEntity {
-      return createRecord(resource.type, {
+      const record = createRecord(resource.type, {
         id: resource.id,
         ...resource.attributes,
       })
+      if (resource.meta) record[META] = resource.meta
+      return record
     }
 
     function setRecord(map: Map<string, Map<string, BaseEntity>>, record: BaseEntity) {

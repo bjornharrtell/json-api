@@ -22,7 +22,7 @@ builder.Services.AddJsonApi<AppDbContext>(options =>
     options.Namespace = "api";
     options.UseRelativeLinks = true;
     options.IncludeTotalResourceCount = true;
-});
+}, discover => discover.AddCurrentAssembly());
 
 // Add CORS
 builder.Services.AddCors(options =>
