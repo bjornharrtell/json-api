@@ -10,14 +10,13 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
-  esbuild: {
-    supported: {
-      decorators: false,
-    },
-  },
   build: {
-    target: 'es2022',
     sourcemap: true,
+    rolldownOptions: {
+      output: {
+        topLevelVar: false,
+      }
+    },
     lib: {
       entry: resolve(__dirname, 'src/lib.ts'),
       formats: ['es'],
