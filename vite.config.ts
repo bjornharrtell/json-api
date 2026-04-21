@@ -14,8 +14,8 @@ export default defineConfig({
     sourcemap: true,
     rolldownOptions: {
       output: {
-        minify:true
-      }
+        minify: true,
+      },
     },
     lib: {
       entry: resolve(__dirname, 'src/lib.ts'),
