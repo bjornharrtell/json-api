@@ -20,11 +20,13 @@ export interface JsonApiResource {
   type: string
   attributes: Record<string, unknown>
   relationships?: Record<string, JsonApiRelationship>
+  meta?: JsonApiMeta
 }
 
 export interface JsonApiMeta {
   // Pagination
   totalPages?: number
+  total?: number
   totalItems?: number
   currentPage?: number
   itemsPerPage?: number
@@ -104,10 +106,22 @@ export interface AtomicOperation {
   ref?: JsonApiReference
 }
 
+export interface SerializeOptions {
+  /** Whether to include to-many (HasMany) relationships when serializing a resource. Defaults to true. */
+  includeToManyRelationships?: boolean
+}
+
+/**
+ * Symbol key used to store JSON:API resource-level meta on a record, avoiding
+ * collisions with a literal "meta" attribute field.
+ */
+export const META: unique symbol = Symbol('meta')
+
 export interface BaseEntity {
   id: string
   lid?: string
   type: string
+  [META]?: JsonApiMeta
 }
 
 /**
@@ -183,7 +197,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return config.kebabCase ? camel(str) : str
   }
 
-  function serialize(record: BaseEntity): JsonApiResource {
+  function serialize(record: BaseEntity, serializeOptions?: SerializeOptions): JsonApiResource {
+    const includeToManyRelationships = serializeOptions?.includeToManyRelationships !== false
     const relationships = relationshipDefinitions.get(record.type)
     const resource: JsonApiResource = serializeRid(record) as JsonApiResource
     resource.attributes = {}
@@ -193,9 +208,11 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       if (relationships && key in relationships && resource.relationships) {
         const rel = relationships[key]
         if (rel.relationshipType === RelationshipType.HasMany) {
-          const entities = value as unknown as BaseEntity[]
-          resource.relationships[key] = {
-            data: entities.map(serializeRid),
+          if (includeToManyRelationships) {
+            const entities = value as unknown as BaseEntity[]
+            resource.relationships[key] = {
+              data: entities.map(serializeRid),
+            }
           }
         } else if (rel.relationshipType === RelationshipType.BelongsTo) {
           const entity = value as unknown as BaseEntity
@@ -205,7 +222,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         } else {
           throw new Error(`Unknown relationship type for ${key}`)
         }
-      } else {
+      } else if (!(relationships && key in relationships)) {
         resource.attributes[key] = value
       }
     }
@@ -233,10 +250,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   function resourcesToRecords(resources: JsonApiResource[], included?: JsonApiResource[]): BaseEntity[] {
     function resourceToRecord(resource: JsonApiResource): BaseEntity {
-      return createRecord(resource.type, {
+      const record = createRecord(resource.type, {
         id: resource.id,
         ...resource.attributes,
       })
+      if (resource.meta) record[META] = resource.meta
+      return record
     }
 
     function setRecord(map: Map<string, Map<string, BaseEntity>>, record: BaseEntity) {
@@ -311,13 +330,13 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     id: string,
     options?: FetchOptions,
     params?: FetchParams,
-  ): Promise<T> {
+  ): Promise<{ doc: JsonApiDocument; record: T }> {
     const doc = await _fetcher.fetchDocument(type, id, options, params)
     const resource = doc.data as JsonApiResource
     const records = resourcesToRecords([resource], doc.included) as T[]
     const record = records[0]
     if (!record) throw new Error(`Record with id ${id} not found`)
-    return record
+    return { doc, record }
   }
 
   async function findRelated(
@@ -379,7 +398,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       // If server returns 204 No Content, fetch the updated record
       if (!doc) {
         if (!record.id) throw new Error('Cannot refetch record without id')
-        return await findRecord<T>(record.type, record.id, options)
+        return (await findRecord<T>(record.type, record.id, options)).record
       }
     }
 
@@ -390,6 +409,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
   async function saveAtomic(
     operations: AtomicOperation[],
     options?: FetchOptions,
+    serializeOptions?: SerializeOptions,
   ): Promise<{ doc: JsonApiAtomicDocument; records: BaseEntity[] } | undefined> {
     function toJsonApiOperation(op: AtomicOperation): JsonApiAtomicOperation {
       const jsonApiOp: JsonApiAtomicOperation = { op: op.op }
@@ -402,7 +422,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
           jsonApiOp.data = op.data as JsonApiResourceIdentifier | null
         } else {
           // Resource operation
-          const resource = serialize(op.data as BaseEntity)
+          const resource = serialize(op.data as BaseEntity, serializeOptions)
           jsonApiOp.data = resource
         }
       }

@@ -1,6 +1,6 @@
 {
   "name": "@bjornharrtell/json-api",
-  "version": "5.4.1",
+  "version": "6.2.0",
   "type": "module",
   "main": "./dist/lib.js",
   "module": "./dist/lib.js",
