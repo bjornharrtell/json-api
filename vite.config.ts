@@ -14,7 +14,7 @@ export default defineConfig({
     sourcemap: true,
     rolldownOptions: {
       output: {
-        topLevelVar: false,
+        minify:true
       }
     },
     lib: {
