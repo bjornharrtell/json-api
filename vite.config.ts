@@ -1,10 +1,10 @@
 import { resolve } from 'node:path'
-import dts from 'vite-plugin-dts'
+import dts from 'unplugin-dts/vite'
 import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [dts({ rollupTypes: true })],
+  plugins: [dts({ bundleTypes: true })],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
