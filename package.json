@@ -2,11 +2,11 @@
   "name": "@bjornharrtell/json-api",
   "version": "6.2.0",
   "type": "module",
-  "main": "./dist/lib.js",
-  "module": "./dist/lib.js",
-  "types": "./dist/lib.d.ts",
+  "main": "./dist/lib.mjs",
+  "module": "./dist/lib.mjs",
+  "types": "./dist/lib.d.mts",
   "exports": {
-    ".": "./dist/lib.js",
+    ".": "./dist/lib.mjs",
     "./*": "./src/*"
   },
   "files": ["README.md", "dist"],
@@ -15,28 +15,26 @@
     "url": "git+https://github.com/bjornharrtell/json-api.git"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --watch",
     "test": "vitest",
     "test:integration": "vitest run tests/integration/jsonapi-dotnetcore.spec.ts",
     "test:coverage": "vitest run --coverage",
     "test:integration:coverage": "vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts",
     "coverage": "vitest run --coverage",
     "coveralls": "pnpm run coverage && cat ./coverage/lcov.info | coveralls",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --clean",
     "type-check": "tsc --noEmit",
     "typedoc": "typedoc"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
-    "@microsoft/api-extractor": "^7.58.7",
-    "@types/node": "^25.7.0",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@biomejs/biome": "2.5.4",
+    "@microsoft/api-extractor": "^7.58.9",
+    "@types/node": "^25.9.5",
+    "@vitest/coverage-v8": "^4.1.10",
     "coveralls": "^3.1.1",
-    "typedoc": "^0.28.19",
+    "tsdown": "^0.22.8",
+    "typedoc": "^0.28.20",
     "typescript": "~6.0.3",
-    "unplugin-dts": "^1.0.0",
-    "vite": "^8.0.12",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.10"
   }
 }

@@ -20,7 +20,7 @@ describe('JsonApiStore', () => {
     const { records: articles } = await articlesJsonApi.findAll<Article>('articles', {
       include: ['comments', 'author'],
     })
-    expect(articles.length).toBe(2)
+    expect(articles).toHaveLength(2)
     const article = articles[0]
     expect(article.id).toBe('1')
     expect(article.title).toBe('JSON:API paints my bikeshed!')
@@ -39,7 +39,7 @@ describe('JsonApiStore', () => {
       title: 'test222',
     } as Article
     const result = (await articlesJsonApi.saveRecord(newArticle)) as Article
-    expect(result.title, newArticle.title)
+    expect(result.title).toBe(newArticle.title)
   })
 
   test('save atomic', async () => {
@@ -65,8 +65,9 @@ describe('JsonApiStore', () => {
       },
     ]
     const result = await articlesJsonApi.saveAtomic(operations)
-    expect((result?.records[0] as Article).title, newArticle.title)
-    expect((result?.records[1] as Article).id, 'local-1')
+    if (!result) throw new Error('Atomic operation failed')
+    expect((result.records[0] as Person).firstName).toBe(newAuthor.firstName)
+    expect((result.records[1] as Article).title).toBe(newArticle.title)
   })
 
   test('same-type relationship chain - people to comments', async () => {
@@ -149,7 +150,8 @@ describe('JsonApiStore', () => {
       },
     ]
 
-    await articlesJsonApi.saveAtomic(removeOperations)
+    const result = await articlesJsonApi.saveAtomic(removeOperations)
+    expect(result).toBeUndefined()
   })
 
   test('error: article not found in fetchDocument', async () => {
