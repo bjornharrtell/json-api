@@ -9,6 +9,8 @@ An instance is created with an endpoint and model definitions and the instance A
 
 Additionally support for the [atomic operation extension](https://jsonapi.org/ext/atomic/) exists via types and `saveAtomic`.
 
+When a record is serialized (by `saveRecord` or a resource operation in `saveAtomic`), a relationship property set to `null` clears the relationship (`data: null` for to-one, `data: []` for to-many), while an `undefined` or absent property is omitted and left unchanged on the server.
+
 ## Example usage
 
 A service returning the canonical example JSON:API document at https://jsonapi.org/ can be consumed this way:
