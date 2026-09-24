@@ -209,15 +209,17 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         const rel = relationships[key]
         if (rel.relationshipType === RelationshipType.HasMany) {
           if (includeToManyRelationships) {
-            const entities = value as unknown as BaseEntity[]
+            // An explicit null clears the to-many relationship, which JSON:API represents as an empty array
+            const entities = (value ?? []) as unknown as BaseEntity[]
             resource.relationships[key] = {
               data: entities.map(serializeRid),
             }
           }
         } else if (rel.relationshipType === RelationshipType.BelongsTo) {
-          const entity = value as unknown as BaseEntity
+          // An explicit null clears the to-one relationship (undefined is skipped above and omitted)
+          const entity = value as unknown as BaseEntity | null
           resource.relationships[key] = {
-            data: serializeRid(entity),
+            data: entity === null ? null : serializeRid(entity),
           }
         } else {
           throw new Error(`Unknown relationship type for ${key}`)
@@ -435,7 +437,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     }
     const doc = await _fetcher.postAtomic(atomicDoc, options)
     if (!doc) return
-    const records = doc[ATOMIC_RESULTS_KEY] ? resourcesToRecords(doc[ATOMIC_RESULTS_KEY].map((r) => r.data)) : []
+    // Per the atomic extension, a result for an operation that returns no data (e.g. update or remove)
+    // may be an empty object `{}` or have `data: null`, so only results with resource data are converted
+    const resources = (doc[ATOMIC_RESULTS_KEY] ?? []).map((r) => r?.data).filter((d): d is JsonApiResource => !!d)
+    const records = resourcesToRecords(resources)
     return { doc, records }
   }
 

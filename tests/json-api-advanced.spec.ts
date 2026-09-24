@@ -725,6 +725,156 @@ describe('JsonApi saveAtomic', () => {
   })
 })
 
+describe('JsonApi saveAtomic relationship clearing and error propagation', () => {
+  const config: JsonApiConfig = {
+    endpoint: 'https://api.example.com',
+    modelDefinitions: [
+      {
+        type: 'articles',
+        relationships: {
+          author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+          comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+        },
+      },
+      { type: 'people' },
+      { type: 'comments' },
+    ],
+  }
+
+  class CapturingFetcher extends MockFetcher {
+    captured: JsonApiAtomicDocument | undefined
+    calls = 0
+    constructor(private result: JsonApiAtomicDocument | undefined = { 'atomic:results': [] }) {
+      super()
+    }
+    override async postAtomic(doc: JsonApiAtomicDocument): Promise<JsonApiAtomicDocument | undefined> {
+      this.calls++
+      this.captured = doc
+      return this.result
+    }
+  }
+
+  function firstResource(fetcher: CapturingFetcher) {
+    return fetcher.captured?.['atomic:operations']?.[0]?.data as JsonApiResource
+  }
+
+  test('update op with null to-one serializes data: null', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([{ op: 'update', data: { id: '1', type: 'articles', author: null } as BaseEntity }])
+    const resource = firstResource(fetcher)
+    expect(resource.relationships).toEqual({ author: { data: null } })
+    expect(resource.attributes).toEqual({})
+    expect(JSON.stringify(fetcher.captured)).toContain('"author":{"data":null}')
+  })
+
+  test('add op with null to-one serializes data: null', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([
+      { op: 'add', data: { id: '', lid: 'tmp-1', type: 'articles', title: 'New', author: null } as BaseEntity },
+    ])
+    const resource = firstResource(fetcher)
+    expect(resource.lid).toBe('tmp-1')
+    expect(resource.attributes).toEqual({ title: 'New' })
+    expect(resource.relationships).toEqual({ author: { data: null } })
+  })
+
+  test('undefined to-one is omitted while non-null to-one is still serialized', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([
+      { op: 'update', data: { id: '1', type: 'articles', title: 'T', author: undefined } as BaseEntity },
+      { op: 'update', data: { id: '2', type: 'articles', author: { id: '5', type: 'people' } } as BaseEntity },
+    ])
+    const ops = fetcher.captured?.['atomic:operations'] ?? []
+    const first = ops[0]?.data as JsonApiResource
+    expect(first.relationships).toEqual({})
+    expect(first.relationships && 'author' in first.relationships).toBe(false)
+    expect(JSON.stringify(first)).not.toContain('author')
+    expect((ops[1]?.data as JsonApiResource | undefined)?.relationships).toEqual({
+      author: { data: { type: 'people', id: '5' } },
+    })
+  })
+
+  test('empty to-many serializes data: []', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([{ op: 'update', data: { id: '1', type: 'articles', comments: [] } as BaseEntity }])
+    expect(firstResource(fetcher).relationships).toEqual({ comments: { data: [] } })
+  })
+
+  test('null to-many serializes data: []', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([{ op: 'update', data: { id: '1', type: 'articles', comments: null } as BaseEntity }])
+    expect(firstResource(fetcher).relationships).toEqual({ comments: { data: [] } })
+  })
+
+  test('saveRecord (PATCH) with null to-one serializes data: null', async () => {
+    let patched: JsonApiResource | undefined
+    class PatchFetcher extends MockFetcher {
+      override async patch(resource: JsonApiResource): Promise<JsonApiDocument> {
+        patched = resource
+        return { data: resource }
+      }
+    }
+    const api = useJsonApi(config, new PatchFetcher())
+    await api.saveRecord({ id: '1', type: 'articles', author: null } as BaseEntity)
+    expect(patched?.relationships).toEqual({ author: { data: null } })
+  })
+
+  test('relationship-level to-one update op passes data: null and resource identifiers through', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await api.saveAtomic([
+      { op: 'update', ref: { type: 'articles', id: '1', relationship: 'author' }, data: null },
+      { op: 'update', ref: { type: 'articles', id: '2', relationship: 'author' }, data: { type: 'people', id: '9' } },
+    ])
+    expect(fetcher.captured?.['atomic:operations']).toEqual([
+      { op: 'update', ref: { type: 'articles', id: '1', relationship: 'author' }, data: null },
+      { op: 'update', ref: { type: 'articles', id: '2', relationship: 'author' }, data: { type: 'people', id: '9' } },
+    ])
+  })
+
+  test('empty {} and data: null atomic results are ignored instead of throwing', async () => {
+    const fetcher = new CapturingFetcher({
+      'atomic:results': [
+        {} as never,
+        { data: null } as never,
+        { data: { id: '3', type: 'articles', attributes: { title: 'Created' } } },
+      ],
+    })
+    const api = useJsonApi(config, fetcher)
+    const result = await api.saveAtomic([
+      { op: 'update', data: { id: '1', type: 'articles', author: null } as BaseEntity },
+    ])
+    expect(result?.records).toHaveLength(1)
+    expect(result?.records[0]).toMatchObject({ id: '3', type: 'articles', title: 'Created' })
+  })
+
+  test('genuine serialization errors reject and no request is sent', async () => {
+    const fetcher = new CapturingFetcher()
+    const api = useJsonApi(config, fetcher)
+    await expect(
+      api.saveAtomic([{ op: 'update', data: { id: '1', type: 'articles', comments: 'not-an-array' } as BaseEntity }]),
+    ).rejects.toThrow(TypeError)
+    expect(fetcher.calls).toBe(0)
+  })
+
+  test('fetcher errors propagate from saveAtomic', async () => {
+    class FailingFetcher extends MockFetcher {
+      override async postAtomic(): Promise<JsonApiAtomicDocument | undefined> {
+        throw new Error('HTTP error! status: 422 Unprocessable Entity')
+      }
+    }
+    const api = useJsonApi(config, new FailingFetcher())
+    await expect(
+      api.saveAtomic([{ op: 'update', data: { id: '1', type: 'articles', author: null } as BaseEntity }]),
+    ).rejects.toThrow('422')
+  })
+})
+
 function makeMetaFetcher(single: boolean): JsonApiFetcher {
   const resource: JsonApiResource = {
     id: '1',
