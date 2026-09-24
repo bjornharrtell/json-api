@@ -1,5 +1,5 @@
 {
   "out": "dist/docs",
-  "entryPoints": ["src/lib.ts"],
+  "entryPoints": ["src/lib.ts", "src/json-api.ts", "src/json-api-fetcher.ts"],
   "excludeInternal": true
 }
