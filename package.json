@@ -1,6 +1,6 @@
 {
   "name": "@bjornharrtell/json-api",
-  "version": "6.2.0",
+  "version": "6.2.1",
   "type": "module",
   "main": "./dist/lib.mjs",
   "module": "./dist/lib.mjs",
