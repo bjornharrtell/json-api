@@ -106,6 +106,19 @@ describe('JsonApiFetcher HTTP methods', () => {
     expect(result).toBeUndefined()
   })
 
+  test('postAtomic rejects a malformed successful response', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected token')
+      },
+    })
+
+    const fetcher = new JsonApiFetcherImpl('https://api.example.com')
+    await expect(fetcher.postAtomic({ 'atomic:operations': [] })).rejects.toBeInstanceOf(JsonApiResponseError)
+  })
+
   test('fetchDocument throws HttpError on error response', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -122,7 +135,7 @@ describe('JsonApiFetcher HTTP methods', () => {
     await expect(fetcher.fetchDocument('articles', '999')).rejects.toThrow('HTTP error! status: 404 Not Found')
   })
 
-  test('fetchDocument preserves legacy behavior for invalid JSON unless strict parsing is enabled', async () => {
+  test('fetchDocument rejects invalid JSON responses by default', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -133,13 +146,10 @@ describe('JsonApiFetcher HTTP methods', () => {
     globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
-    await expect(fetcher.fetchDocument('articles')).resolves.toBeUndefined()
-    await expect(fetcher.fetchDocument('articles', undefined, { strictResponseParsing: true })).rejects.toBeInstanceOf(
-      JsonApiResponseError,
-    )
+    await expect(fetcher.fetchDocument('articles')).rejects.toBeInstanceOf(JsonApiResponseError)
   })
 
-  test('strict response parsing reports successful empty responses', async () => {
+  test('fetchDocument rejects successful 204 responses that require a document', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 204,
@@ -151,9 +161,26 @@ describe('JsonApiFetcher HTTP methods', () => {
     globalThis.fetch = mockFetch
 
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
-    await expect(fetcher.fetchDocument('articles', undefined, { strictResponseParsing: true })).rejects.toThrow(
+    await expect(fetcher.fetchDocument('articles')).rejects.toThrow(
       'Expected a JSON:API document but received HTTP 204 No Content',
     )
+  })
+
+  test('patch accepts 204 No Content', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: 'No Content',
+      json: async () => {
+        throw new Error('No content')
+      },
+    })
+    globalThis.fetch = mockFetch
+
+    const fetcher = new JsonApiFetcherImpl('https://api.example.com')
+    await expect(
+      fetcher.patch({ id: '1', type: 'articles', attributes: { title: 'Updated' } }),
+    ).resolves.toBeUndefined()
   })
 
   test('createOptions builds query parameters correctly', () => {

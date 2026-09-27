@@ -99,12 +99,13 @@ expect(article.author?.firstName).toBe('Dan')
 
 `FetchOptions` supports sparse fieldsets (`fields`), pagination (`page`), included relationships (`include`), a `filter` string, request `headers`, and an `AbortSignal` (`signal`). Additional query parameters can be passed as the `params` argument to read methods. `kebabCase: true` converts kebab-case attribute and relationship names to camelCase on records and back to their JSON:API names when serializing.
 
-## Response compatibility options
+## Response handling
 
-Both options below are opt-in; omitting them retains the existing behavior.
+Successful responses that require a JSON:API document must contain valid JSON. If the body is empty or malformed, the fetcher throws `JsonApiResponseError` with the response status and the parse error as its cause. This error reports invalid JSON syntax; it does not validate that successfully parsed JSON conforms to the JSON:API schema. For non-success HTTP responses, the fetcher throws an HTTP error and includes a parsed response body when available.
 
-- `preserveNullRelationships: true` in `useJsonApi` assigns an explicit `data: null` to-one relationship as `null` on the normalized record. By default, null relationships remain unset. Links-only relationships (which omit `data`) remain unset.
-- `strictResponseParsing: true` in `FetchOptions` rejects a successful response with an invalid or unexpectedly empty JSON body with `JsonApiResponseError`. The default remains lenient for compatibility. A `204 No Content` response to an atomic operation remains valid and returns `undefined`.
+`204 No Content` is valid for PATCH and atomic-operation requests and returns `undefined`. A request that needs a document—such as a read or a POST that is expected to return a resource—throws `JsonApiResponseError` if it receives `204`.
+
+`preserveNullRelationships: true` in `useJsonApi` assigns an explicit `data: null` to-one relationship as `null` on the normalized record. By default, null relationships remain unset. Links-only relationships (which omit `data`) remain unset.
 
 `JsonApiWireDocument`, `JsonApiWireResource`, `JsonApiWireRelationship`, and related `JsonApiWire*` types describe incoming JSON:API payloads, including optional members, `data: null`, and links-only relationships. The existing `JsonApiDocument` and `JsonApiResource` types remain available unchanged for compatibility.
 
