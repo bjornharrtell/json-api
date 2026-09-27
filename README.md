@@ -120,3 +120,7 @@ pnpm build
 ```
 
 The integration test starts a local .NET 10 JSON:API server; see [`tests/integration/jsonapi-server/README.md`](tests/integration/jsonapi-server/README.md) for prerequisites. `pnpm build` also generates the API reference under `dist/docs`.
+
+## Publishing
+
+Configure npm trusted publishing for this GitHub repository and the `.github/workflows/publish.yml` workflow. To publish a release, push a tag matching the version in `package.json` (for example, `7.0.0`). The workflow verifies the tag, type-checks and builds the package, then publishes it to npm with provenance.
