@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1"
 axum = "0.8"
-seamark = { git = "https://github.com/bjornharrtell/seamark.git", rev = "cde89456660a504c4e28dac5f0c8d888fc1c8428" }
+seamark = { git = "https://github.com/bjornharrtell/seamark.git", rev = "2dcfba17a1042866801fe0bdb3cfbfe702ee1b50" }
 serde_json = "1"
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread"] }
