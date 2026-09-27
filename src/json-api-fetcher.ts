@@ -49,11 +49,28 @@ class HttpError extends Error {
   }
 }
 
+export class JsonApiResponseError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
+    this.name = 'JsonApiResponseError'
+  }
+}
+
 async function tryJson(response: Response) {
   try {
     return await response.json()
-  } catch {
-    // Ignore JSON parsing errors
+  } catch (error) {
+    if (response.ok && response.status !== 204) {
+      throw new JsonApiResponseError(
+        `Failed to parse JSON:API response with status ${response.status}`,
+        response.status,
+        { cause: error },
+      )
+    }
   }
 }
 
@@ -67,6 +84,9 @@ async function req(url: string, options: Options) {
     signal,
     body,
   })
+  if (response.ok && response.status === 204) {
+    throw new JsonApiResponseError('Expected a JSON:API document but received HTTP 204 No Content', response.status)
+  }
   const responseBody = await tryJson(response)
   if (!response.ok)
     throw new HttpError(`${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`, response.status, responseBody)

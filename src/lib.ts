@@ -13,6 +13,12 @@ export type {
   JsonApiRelationship,
   JsonApiResource,
   JsonApiResourceIdentifier,
+  JsonApiWireAtomicDocument,
+  JsonApiWireAtomicResult,
+  JsonApiWireDocument,
+  JsonApiWireError,
+  JsonApiWireRelationship,
+  JsonApiWireResource,
   ModelDefinition,
   Relationship,
 } from './json-api.ts'
@@ -25,4 +31,5 @@ export {
   useJsonApi,
 } from './json-api.ts'
 export type { FetchOptions, FetchParams, JsonApiFetcher, PageOption } from './json-api-fetcher.ts'
+export { JsonApiResponseError } from './json-api-fetcher.ts'
 export { camel } from './util.ts'
