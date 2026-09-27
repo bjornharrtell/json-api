@@ -16,9 +16,10 @@
   "scripts": {
     "dev": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --watch",
     "test": "vitest",
-    "test:integration": "vitest run tests/integration/jsonapi-dotnetcore.spec.ts",
+    "test:integration": "vitest run tests/integration/jsonapi-dotnetcore.spec.ts tests/integration/seamark-axum.spec.ts",
+    "test:integration:seamark": "vitest run tests/integration/seamark-axum.spec.ts",
     "test:coverage": "vitest run --coverage",
-    "test:integration:coverage": "vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts",
+    "test:integration:coverage": "vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts tests/integration/seamark-axum.spec.ts",
     "coverage": "vitest run --coverage",
     "coveralls": "pnpm run coverage && cat ./coverage/lcov.info | coveralls",
     "build": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --clean && pnpm typedoc",
