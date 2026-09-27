@@ -1420,7 +1420,7 @@ dependencies = [
 [[package]]
 name = "seamark"
 version = "0.1.0"
-source = "git+https://github.com/bjornharrtell/seamark.git?rev=37b23c2dc54fcf0777bec7d911f53cc098fd06fb#37b23c2dc54fcf0777bec7d911f53cc098fd06fb"
+source = "git+https://github.com/bjornharrtell/seamark.git?rev=97cdaaf0b59d10ee7cc85d119a3202ab71d2ce51#97cdaaf0b59d10ee7cc85d119a3202ab71d2ce51"
 dependencies = [
  "async-trait",
  "axum",
