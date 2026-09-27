@@ -268,6 +268,71 @@ describe('JsonApi findRelated', () => {
     expect(post.author).toBeDefined()
     expect(post.author?.id).toBe('1')
   })
+
+  test('findRelated preserves a null BelongsTo relationship when enabled', async () => {
+    class NullBelongsToFetcher extends MockFetcher {
+      override async fetchBelongsTo(): Promise<JsonApiDocument> {
+        return { data: null } as unknown as JsonApiDocument
+      }
+    }
+
+    const api = useJsonApi({ ...config, preserveNullRelationships: true }, new NullBelongsToFetcher())
+    const post = api.createRecord<User & { author?: BaseEntity | null }>('posts', { id: '1' })
+    await api.findRelated(post, 'author')
+    expect(post.author).toBeNull()
+  })
+})
+
+describe('JsonApi response relationship normalization', () => {
+  interface Article extends BaseEntity {
+    author?: BaseEntity | null
+    comments?: BaseEntity[]
+  }
+
+  const config: JsonApiConfig = {
+    endpoint: 'https://api.example.com',
+    modelDefinitions: [
+      {
+        type: 'articles',
+        relationships: {
+          author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+          comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+        },
+      },
+      { type: 'people' },
+      { type: 'comments' },
+    ],
+  }
+
+  class RelationshipResponseFetcher extends MockFetcher {
+    override async fetchDocument(): Promise<JsonApiDocument> {
+      return {
+        data: {
+          id: '1',
+          type: 'articles',
+          attributes: {},
+          relationships: {
+            author: { data: null },
+            comments: { links: { related: '/articles/1/comments' } } as never,
+          },
+        } as JsonApiResource,
+      }
+    }
+  }
+
+  test('preserves explicit null to-one relationship when enabled', async () => {
+    const api = useJsonApi({ ...config, preserveNullRelationships: true }, new RelationshipResponseFetcher())
+    const { record } = await api.findRecord<Article>('articles', '1')
+    expect(record.author).toBeNull()
+    expect(record.comments).toBeUndefined()
+  })
+
+  test('keeps legacy behavior for null and links-only relationships by default', async () => {
+    const api = useJsonApi(config, new RelationshipResponseFetcher())
+    const { record } = await api.findRecord<Article>('articles', '1')
+    expect(record.author).toBeUndefined()
+    expect(record.comments).toBeUndefined()
+  })
 })
 
 describe('JsonApi error handling', () => {

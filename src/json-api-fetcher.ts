@@ -24,6 +24,8 @@ export interface FetchOptions {
   headers?: HeadersInit
   body?: BodyInit
   signal?: AbortSignal
+  /** Reject successful responses whose bodies are not valid JSON. Defaults to false for compatibility. */
+  strictResponseParsing?: boolean
 }
 
 export interface FetchParams {
@@ -36,6 +38,7 @@ export interface Options {
   method?: string
   body?: BodyInit
   signal?: AbortSignal
+  strictResponseParsing?: boolean
 }
 
 class HttpError extends Error {
@@ -49,16 +52,33 @@ class HttpError extends Error {
   }
 }
 
-async function tryJson(response: Response) {
+export class JsonApiResponseError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
+    this.name = 'JsonApiResponseError'
+  }
+}
+
+async function tryJson(response: Response, strictResponseParsing = false) {
   try {
     return await response.json()
-  } catch {
-    // Ignore JSON parsing errors
+  } catch (error) {
+    if (strictResponseParsing && response.ok && response.status !== 204) {
+      throw new JsonApiResponseError(
+        `Failed to parse JSON:API response with status ${response.status}`,
+        response.status,
+        { cause: error },
+      )
+    }
   }
 }
 
 async function req(url: string, options: Options) {
-  const { headers, searchParams, method, signal, body } = options
+  const { headers, searchParams, method, signal, body, strictResponseParsing } = options
   const textSearchParams = searchParams ? `?${searchParams}` : ''
   const finalUrl = url.replace(/(?:\?.*?)?(?=#|$)/, textSearchParams)
   const response = await fetch(finalUrl, {
@@ -67,7 +87,10 @@ async function req(url: string, options: Options) {
     signal,
     body,
   })
-  const responseBody = await tryJson(response)
+  if (strictResponseParsing && response.ok && response.status === 204) {
+    throw new JsonApiResponseError('Expected a JSON:API document but received HTTP 204 No Content', response.status)
+  }
+  const responseBody = await tryJson(response, strictResponseParsing)
   if (!response.ok)
     throw new HttpError(`${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`, response.status, responseBody)
   const data = responseBody as JsonApiDocument
@@ -86,7 +109,7 @@ async function postAtomic(url: string, options: FetchOptions) {
     signal,
     body,
   })
-  const responseBody = await tryJson(response)
+  const responseBody = await tryJson(response, options.strictResponseParsing)
   if (!response.ok)
     throw new HttpError(`${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`, response.status, responseBody)
   if (response.status === 204) return
@@ -102,7 +125,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
     const searchParams = new URLSearchParams()
     const headers = new Headers(options.headers ?? {})
     headers.append(HEADER_ACCEPT, CONTENT_TYPE_JSON_API)
-    const requestOptions = { searchParams, headers, body }
+    const requestOptions = { searchParams, headers, body, strictResponseParsing: options.strictResponseParsing }
     if (options.fields)
       for (const [key, value] of Object.entries(options.fields)) searchParams.append(`fields[${key}]`, value.join(','))
     if (options.page?.size) searchParams.append('page[size]', options.page.size.toString())
@@ -169,7 +192,7 @@ export class JsonApiFetcherImpl implements JsonApiFetcher {
       signal: options?.signal,
       body,
     })
-    const responseBody = await tryJson(response)
+    const responseBody = await tryJson(response, options?.strictResponseParsing)
     if (!response.ok)
       throw new HttpError(
         `${HTTP_ERROR_PREFIX}${response.status} ${response.statusText}`,

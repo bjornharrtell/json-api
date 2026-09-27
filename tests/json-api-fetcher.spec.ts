@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test, vi } from 'vitest'
 import type { JsonApiResource } from '../src/json-api.ts'
-import { JsonApiFetcherImpl } from '../src/json-api-fetcher.ts'
+import { JsonApiFetcherImpl, JsonApiResponseError } from '../src/json-api-fetcher.ts'
 
 // Setup fetch mock
 beforeAll(() => {
@@ -120,6 +120,40 @@ describe('JsonApiFetcher HTTP methods', () => {
     const fetcher = new JsonApiFetcherImpl('https://api.example.com')
 
     await expect(fetcher.fetchDocument('articles', '999')).rejects.toThrow('HTTP error! status: 404 Not Found')
+  })
+
+  test('fetchDocument preserves legacy behavior for invalid JSON unless strict parsing is enabled', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected token')
+      },
+    })
+    globalThis.fetch = mockFetch
+
+    const fetcher = new JsonApiFetcherImpl('https://api.example.com')
+    await expect(fetcher.fetchDocument('articles')).resolves.toBeUndefined()
+    await expect(fetcher.fetchDocument('articles', undefined, { strictResponseParsing: true })).rejects.toBeInstanceOf(
+      JsonApiResponseError,
+    )
+  })
+
+  test('strict response parsing reports successful empty responses', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: 'No Content',
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input')
+      },
+    })
+    globalThis.fetch = mockFetch
+
+    const fetcher = new JsonApiFetcherImpl('https://api.example.com')
+    await expect(fetcher.fetchDocument('articles', undefined, { strictResponseParsing: true })).rejects.toThrow(
+      'Expected a JSON:API document but received HTTP 204 No Content',
+    )
   })
 
   test('createOptions builds query parameters correctly', () => {

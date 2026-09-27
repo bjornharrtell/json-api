@@ -14,12 +14,27 @@ export interface JsonApiRelationship {
   data: null | [] | JsonApiResourceIdentifier | JsonApiResourceIdentifier[]
 }
 
+export interface JsonApiWireRelationship {
+  data?: null | JsonApiResourceIdentifier | JsonApiResourceIdentifier[]
+  links?: JsonApiLinks
+  meta?: JsonApiMeta
+}
+
 export interface JsonApiResource {
   id?: string
   lid?: string
   type: string
   attributes: Record<string, unknown>
   relationships?: Record<string, JsonApiRelationship>
+  meta?: JsonApiMeta
+}
+
+export interface JsonApiWireResource {
+  id?: string
+  lid?: string
+  type: string
+  attributes?: Record<string, unknown>
+  relationships?: Record<string, JsonApiWireRelationship>
   meta?: JsonApiMeta
 }
 
@@ -70,6 +85,14 @@ export interface JsonApiDocument {
   meta?: JsonApiMeta
 }
 
+export interface JsonApiWireDocument {
+  links?: JsonApiLinks
+  data?: JsonApiWireResource | JsonApiWireResource[] | null
+  errors?: JsonApiWireError[]
+  included?: JsonApiWireResource[]
+  meta?: JsonApiMeta
+}
+
 export interface JsonApiReference extends JsonApiResourceIdentifier {
   relationship?: string
 }
@@ -80,6 +103,21 @@ export interface JsonApiError {
   code?: string
   title: string
   detail?: string
+  meta?: JsonApiMeta
+}
+
+export interface JsonApiWireError {
+  id?: string
+  status?: string
+  code?: string
+  title?: string
+  detail?: string
+  links?: Record<string, JsonApiLink>
+  source?: {
+    pointer?: string
+    parameter?: string
+    header?: string
+  }
   meta?: JsonApiMeta
 }
 
@@ -98,6 +136,17 @@ export interface JsonApiAtomicDocument {
   'atomic:operations'?: JsonApiAtomicOperation[]
   'atomic:results'?: JsonApiAtomicResult[]
   errors?: JsonApiError[]
+}
+
+export interface JsonApiWireAtomicResult {
+  data?: JsonApiWireResource | null
+  meta?: JsonApiMeta
+}
+
+export interface JsonApiWireAtomicDocument {
+  'atomic:operations'?: JsonApiAtomicOperation[]
+  'atomic:results'?: JsonApiWireAtomicResult[]
+  errors?: JsonApiWireError[]
 }
 
 export interface AtomicOperation {
@@ -151,6 +200,11 @@ export interface JsonApiConfig {
    * Whether to convert kebab-case names from JSON:API (older convention) to camelCase
    */
   kebabCase?: boolean
+  /**
+   * Preserve explicit null to-one relationships as null on normalized records.
+   * Defaults to false to retain the legacy behavior of leaving them unset.
+   */
+  preserveNullRelationships?: boolean
 }
 
 export enum RelationshipType {
@@ -250,8 +304,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     return record
   }
 
-  function resourcesToRecords(resources: JsonApiResource[], included?: JsonApiResource[]): BaseEntity[] {
-    function resourceToRecord(resource: JsonApiResource): BaseEntity {
+  function resourcesToRecords(resources: JsonApiWireResource[], included?: JsonApiWireResource[]): BaseEntity[] {
+    function resourceToRecord(resource: JsonApiWireResource): BaseEntity {
       const record = createRecord(resource.type, {
         id: resource.id,
         ...resource.attributes,
@@ -278,7 +332,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     const recordsMap = new Map<string, Map<string, BaseEntity>>()
     for (const record of records) setRecord(recordsMap, record)
 
-    function populateRelationships(resource: JsonApiResource) {
+    function populateRelationships(resource: JsonApiWireResource, nullRelationshipsOnly = false) {
       const record = getRecord(recordsMap, resource) ?? getRecord(includedMap, resource)
       if (!record) throw new Error('Unexpected not found record')
 
@@ -291,7 +345,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
         const normalizedName = normalize(name)
         const rel = rels[normalizedName]
         if (!rel) continue
-        if (!reldoc.data) continue
+        if (reldoc.data === null) {
+          if (config.preserveNullRelationships && rel.relationshipType === RelationshipType.BelongsTo)
+            setRelationship(record, normalizedName, null)
+          continue
+        }
+        if (nullRelationshipsOnly || reldoc.data === undefined) continue
         const rids =
           rel.relationshipType === RelationshipType.HasMany
             ? (reldoc.data as JsonApiResourceIdentifier[])
@@ -311,6 +370,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     if (included) {
       for (const r of resources) populateRelationships(r)
       for (const r of included) populateRelationships(r)
+    } else if (config.preserveNullRelationships) {
+      for (const r of resources) populateRelationships(r, true)
     }
 
     return records
@@ -356,6 +417,10 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
     if (rel.relationshipType === RelationshipType.BelongsTo) {
       const doc = await _fetcher.fetchBelongsTo(type, record.id, relationshipName, options, params)
+      if (config.preserveNullRelationships && doc.data === null) {
+        setRelationship(record, relationshipName, null)
+        return doc
+      }
       const related = doc.data as JsonApiResource
       const relatedRecord = createRecord(rel.type, {
         id: related.id,

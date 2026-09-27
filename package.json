@@ -6,8 +6,7 @@
   "module": "./dist/lib.mjs",
   "types": "./dist/lib.d.mts",
   "exports": {
-    ".": "./dist/lib.mjs",
-    "./*": "./src/*"
+    ".": "./dist/lib.mjs"
   },
   "files": ["README.md", "dist"],
   "repository": {
@@ -22,7 +21,7 @@
     "test:integration:coverage": "vitest run --coverage tests/integration/jsonapi-dotnetcore.spec.ts",
     "coverage": "vitest run --coverage",
     "coveralls": "pnpm run coverage && cat ./coverage/lcov.info | coveralls",
-    "build": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --clean",
+    "build": "tsdown src/lib.ts --format esm --dts --sourcemap --minify --clean && pnpm typedoc",
     "type-check": "tsc --noEmit",
     "typedoc": "typedoc"
   },
