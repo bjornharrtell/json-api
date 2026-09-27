@@ -3,7 +3,7 @@
 This fixture exercises the TypeScript JSON:API client against an Axum server
 built with the public `seamark::http::router` API. Its Seamark dependency is
 pinned to Git revision
-`c39b44760722af96d0264098049106aee3017230` for reproducible builds; Cargo
+`b5fc72120cbfed087a1aeba6eceb607378297f3a` for reproducible builds; Cargo
 fetches that revision from the public Seamark repository.
 
 Run it from the `json-api` repository root with:
