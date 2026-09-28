@@ -1,10 +1,9 @@
 # Seamark Axum integration fixture
 
 This fixture exercises the TypeScript JSON:API client against an Axum server
-built with the public `seamark::http::router` API. Its Seamark dependency is
-pinned to Git revision
-`97cdaaf0b59d10ee7cc85d119a3202ab71d2ce51` for reproducible builds; Cargo
-fetches that revision from the public Seamark repository.
+built with Seamark's public query, mutation, and Atomic Operations router APIs.
+Its Seamark dependency uses the published crates.io release `0.1.0` for
+reproducible builds.
 
 Run it from the `json-api` repository root with:
 
@@ -12,22 +11,17 @@ Run it from the `json-api` repository root with:
 pnpm test:integration:seamark
 ```
 
-## Current Seamark scope
+## Coverage and limitation
 
-The fixture covers unqueried collection and single-resource reads for articles,
-people, and comments. The other existing JsonApiDotNetCore assertions cannot be
-mirrored yet because the current Seamark `router` only serves `GET` collection
-and resource routes and rejects every non-empty query string:
+The Seamark client suite mirrors the JsonApiDotNetCore integration assertions
+for article/people/comment reads and includes, resource creation, Atomic
+Operations (including local IDs and relationship mutations), and PATCH. The
+fixture keeps its resources in process memory; an in-memory SQLite connection
+provides the transaction boundary required by Seamark's Atomic HTTP router.
 
-- `include`-based assertions for populated article comments/authors and comment
-  authors are unavailable; their resource-identifier relationship linkage can
-  be returned, but compound `included` resources cannot be requested through
-  this router.
-- `POST`, `PATCH`, and the client operations that depend on them are not
-  implemented by this read-only router. The standalone Atomic Operations
-  router is not part of this fixture.
-- The current `AdapterResource` has no resource-level metadata field, so the
-  JsonApiDotNetCore copyright metadata assertion has no equivalent.
-
-These omissions are limited to the Seamark fixture; the existing
-JsonApiDotNetCore integration tests and their assertions remain unchanged.
+The one omitted assertion is the article copyright resource-level `meta`.
+Seamark's public `AdapterResource` has no resource-level metadata field, and
+the HTTP router projects resource objects from the registered attributes and
+relationships, so this fixture cannot produce that resource-level `meta`
+without bypassing Seamark's public response path. The existing
+JsonApiDotNetCore assertion remains unchanged.
