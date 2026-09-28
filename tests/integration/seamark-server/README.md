@@ -1,9 +1,9 @@
 # Seamark Axum integration fixture
 
 This fixture exercises the TypeScript JSON:API client against an Axum server
-built with Seamark's public query, mutation, and Atomic Operations router APIs.
-Its Seamark dependency uses the published crates.io release `0.1.0` for
-reproducible builds.
+built with Seamark's API builder and public query, mutation, and Atomic
+Operations APIs. Its Seamark dependency uses the published crates.io release
+`0.2.0` for reproducible builds.
 
 Run it from the `json-api` repository root with:
 
@@ -21,7 +21,7 @@ provides the transaction boundary required by Seamark's Atomic HTTP router.
 
 The one omitted assertion is the article copyright resource-level `meta`.
 Seamark's public `AdapterResource` has no resource-level metadata field, and
-the HTTP router projects resource objects from the registered attributes and
-relationships, so this fixture cannot produce that resource-level `meta`
-without bypassing Seamark's public response path. The existing
-JsonApiDotNetCore assertion remains unchanged.
+registry-based projection produces resource objects from registered
+attributes and relationships, so this fixture cannot produce that
+resource-level `meta` without bypassing Seamark's public response path. The
+existing JsonApiDotNetCore assertion remains unchanged.

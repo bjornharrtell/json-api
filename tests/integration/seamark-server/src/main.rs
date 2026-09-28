@@ -5,19 +5,25 @@ use async_trait::async_trait;
 use axum::{Router, routing::get};
 use sea_orm::{Database, DatabaseConnection, DatabaseTransaction};
 use seamark::atomic::{
-    AtomicOperationHandler, AtomicOperationOutcome, AtomicOperationsGuard, AtomicResourceChangeset,
-    AtomicResult, AtomicTarget, LocalIdMap, PlannedAtomicOperation, PlannedOperation,
+    AtomicOperationHandler, AtomicOperationOutcome, AtomicResourceChangeset, AtomicResult,
+    AtomicTarget, LocalIdMap, PlannedAtomicOperation, PlannedOperation,
 };
+use seamark::authorization::{AuthorizationPolicy, SharedAuthorization};
 use seamark::document::{Relationship, RelationshipData, ResourceIdentifier};
 use seamark::http::{
-    self, AdapterError, AdapterIncludedResource, AdapterResource, AllowAllAuthorizer,
-    MutationAdapterError, MutationCommand, MutationOutcome, MutationResourceAdapter,
-    QueryAdapterError, QueryCollectionResult, QueryResourceAdapter, QueryResourceResult,
-    RelationshipMutation, ResourceAdapter, ResourceMutationChangeset,
+    AdapterIncludedResource, AdapterResource, ApiBuilder, MutationAction, MutationAdapterError,
+    MutationCommand, MutationOutcome, MutationResourceAdapter, QueryAdapterError,
+    QueryCollectionResult, QueryResourceAdapter, QueryResourceResult, RelationshipMutation,
+    ResourceMutationChangeset,
 };
+use seamark::limits::ExecutionLimits;
+use seamark::projection::project_resource;
 use seamark::query::{IncludeNode, PaginationConfig, ReadPlan};
-use seamark::registry::{ResourceDefinition, ResourceRegistry};
-use serde_json::{Map, Value, json};
+use seamark::registry::{
+    AttributeMapping, AttributePermission, RelationshipCardinality, RelationshipMapping,
+    RelationshipPermission, ResourceDefinition, ResourcePermission, ResourceRegistry,
+};
+use serde_json::{Value, json};
 
 #[derive(Default)]
 struct Store {
@@ -138,24 +144,6 @@ impl Store {
 
 #[derive(Clone)]
 struct StoreAdapter(Arc<Mutex<Store>>);
-
-#[async_trait]
-impl ResourceAdapter for StoreAdapter {
-    async fn collection(
-        &self,
-        resource: &ResourceDefinition,
-    ) -> Result<Vec<AdapterResource>, AdapterError> {
-        Ok(self.0.lock().unwrap().collection(resource.type_name()))
-    }
-
-    async fn resource(
-        &self,
-        resource: &ResourceDefinition,
-        id: &str,
-    ) -> Result<Option<AdapterResource>, AdapterError> {
-        Ok(self.0.lock().unwrap().resource(resource.type_name(), id))
-    }
-}
 
 #[async_trait]
 impl QueryResourceAdapter for StoreAdapter {
@@ -369,24 +357,36 @@ fn same_identity(left: &ResourceIdentifier, right: &ResourceIdentifier) -> bool 
     left.type_name == right.type_name && left.id == right.id
 }
 
-struct FixtureAtomicGuard;
+struct FixtureAuthorizationPolicy;
 
 #[async_trait]
-impl AtomicOperationsGuard for FixtureAtomicGuard {
-    async fn authorize(
+impl AuthorizationPolicy for FixtureAuthorizationPolicy {
+    async fn authorize_read(
+        &self,
+        _resource_type: &str,
+        _resource_id: Option<&str>,
+        _headers: &axum::http::HeaderMap,
+    ) -> bool {
+        true
+    }
+
+    async fn authorize_mutation(
+        &self,
+        _action: MutationAction,
+        _resource: &ResourceDefinition,
+        _resource_id: Option<&str>,
+        _command: &MutationCommand,
+        _headers: &axum::http::HeaderMap,
+    ) -> bool {
+        true
+    }
+
+    async fn authorize_atomic(
         &self,
         _headers: &axum::http::HeaderMap,
         _operations: &[PlannedAtomicOperation],
     ) -> bool {
         true
-    }
-
-    fn validate_limits(&self, operations: &[PlannedAtomicOperation]) -> Result<(), String> {
-        if operations.len() <= 100 {
-            Ok(())
-        } else {
-            Err("at most 100 operations are allowed".to_owned())
-        }
     }
 }
 
@@ -649,37 +649,9 @@ fn resource_value(
     let definition = registry
         .resource(resource_type)
         .map_err(|error| error.to_string())?;
-    let attributes: Map<String, Value> = definition
-        .attributes()
-        .iter()
-        .filter_map(|mapping| {
-            resource
-                .attributes
-                .get(mapping.model_field())
-                .map(|value| (mapping.public_name().to_owned(), value.clone()))
-        })
-        .collect();
-    let relationships: Map<String, Value> = definition
-        .relationships()
-        .iter()
-        .filter_map(|mapping| {
-            resource
-                .relationships
-                .get(mapping.model_field())
-                .map(|relationship| {
-                    (
-                        mapping.public_name().to_owned(),
-                        serde_json::to_value(relationship).unwrap(),
-                    )
-                })
-        })
-        .collect();
-    Ok(json!({
-        "type": resource_type,
-        "id": resource.id,
-        "attributes": attributes,
-        "relationships": relationships,
-    }))
+    let projected = project_resource(definition, resource)
+        .map_err(|error| format!("could not project `{resource_type}` resource: {error:?}"))?;
+    serde_json::to_value(projected).map_err(|error| error.to_string())
 }
 
 fn article(id: &str, title: &str, author_id: &str, comment_ids: &[&str]) -> AdapterResource {
@@ -742,47 +714,148 @@ fn identifier(resource_type: &str, id: &str) -> ResourceIdentifier {
     }
 }
 
+fn attribute_mapping(
+    public_name: &str,
+    model_field: &str,
+    permissions: &[AttributePermission],
+) -> AttributeMapping {
+    permissions.iter().fold(
+        AttributeMapping::new(public_name, model_field),
+        |mapping, permission| mapping.allow(*permission),
+    )
+}
+
+fn relationship_mapping(
+    public_name: &str,
+    model_field: &str,
+    target_type: &str,
+    cardinality: RelationshipCardinality,
+    permissions: &[RelationshipPermission],
+) -> RelationshipMapping {
+    let mapping = RelationshipMapping::new(public_name, model_field, target_type);
+    let mapping = match cardinality {
+        RelationshipCardinality::ToOne => mapping.to_one(),
+        RelationshipCardinality::ToMany => mapping.to_many(),
+    };
+    permissions
+        .iter()
+        .fold(mapping, |mapping, permission| mapping.allow(*permission))
+}
+
 #[tokio::main]
 async fn main() {
     let registry = Arc::new(
         ResourceRegistry::new([
             ResourceDefinition::new("articles", "id")
-                .attribute("title", "title", false, false)
-                .to_one_relationship("author", "author_id", "people")
-                .to_many_relationship("comments", "comment_ids", "comments"),
+                .allow(ResourcePermission::Create)
+                .allow(ResourcePermission::Update)
+                .allow(ResourcePermission::AtomicCreate)
+                .allow(ResourcePermission::AtomicUpdate)
+                .mapped_attribute(attribute_mapping(
+                    "title",
+                    "title",
+                    &[
+                        AttributePermission::Create,
+                        AttributePermission::Update,
+                        AttributePermission::AtomicCreate,
+                        AttributePermission::AtomicUpdate,
+                    ],
+                ))
+                .mapped_relationship(relationship_mapping(
+                    "author",
+                    "author_id",
+                    "people",
+                    RelationshipCardinality::ToOne,
+                    &[
+                        RelationshipPermission::Include,
+                        RelationshipPermission::ResourceCreate,
+                        RelationshipPermission::AtomicResourceCreate,
+                        RelationshipPermission::AtomicResourceUpdate,
+                    ],
+                ))
+                .mapped_relationship(relationship_mapping(
+                    "comments",
+                    "comment_ids",
+                    "comments",
+                    RelationshipCardinality::ToMany,
+                    &[
+                        RelationshipPermission::Include,
+                        RelationshipPermission::AtomicAdd,
+                        RelationshipPermission::AtomicReplace,
+                        RelationshipPermission::AtomicRemove,
+                    ],
+                )),
             ResourceDefinition::new("people", "id")
-                .attribute("firstName", "first_name", false, false)
-                .attribute("lastName", "last_name", false, false)
-                .attribute("twitter", "twitter", false, false)
-                .to_many_relationship("comments", "comment_ids", "comments"),
+                .allow(ResourcePermission::AtomicCreate)
+                .mapped_attribute(attribute_mapping(
+                    "firstName",
+                    "first_name",
+                    &[AttributePermission::AtomicCreate],
+                ))
+                .mapped_attribute(attribute_mapping(
+                    "lastName",
+                    "last_name",
+                    &[AttributePermission::AtomicCreate],
+                ))
+                .mapped_attribute(attribute_mapping(
+                    "twitter",
+                    "twitter",
+                    &[AttributePermission::AtomicCreate],
+                ))
+                .mapped_relationship(relationship_mapping(
+                    "comments",
+                    "comment_ids",
+                    "comments",
+                    RelationshipCardinality::ToMany,
+                    &[RelationshipPermission::Include],
+                )),
             ResourceDefinition::new("comments", "id")
-                .attribute("body", "body", false, false)
-                .to_one_relationship("author", "author_id", "people")
-                .to_one_relationship("article", "article_id", "articles"),
+                .allow(ResourcePermission::Create)
+                .mapped_attribute(attribute_mapping(
+                    "body",
+                    "body",
+                    &[AttributePermission::Create],
+                ))
+                .mapped_relationship(relationship_mapping(
+                    "author",
+                    "author_id",
+                    "people",
+                    RelationshipCardinality::ToOne,
+                    &[RelationshipPermission::Include],
+                ))
+                .mapped_relationship(relationship_mapping(
+                    "article",
+                    "article_id",
+                    "articles",
+                    RelationshipCardinality::ToOne,
+                    &[RelationshipPermission::Include],
+                )),
         ])
         .expect("resource definitions are valid"),
     );
     let store = Arc::new(Mutex::new(Store::seeded()));
     let adapter = Arc::new(StoreAdapter(Arc::clone(&store)));
-    let api = http::router_with_query_and_mutations(
-        Arc::clone(&registry),
-        adapter.clone(),
-        Arc::new(AllowAllAuthorizer),
-        adapter.clone(),
-        Arc::new(StoreMutationAdapter(Arc::clone(&store))),
-        PaginationConfig::new(1, 100, Some(100), Some(100)).expect("pagination settings are valid"),
-    );
+    let authorization = Arc::new(SharedAuthorization::new(FixtureAuthorizationPolicy));
     let database: DatabaseConnection = Database::connect("sqlite::memory:")
         .await
         .expect("connect in-memory SQLite for Atomic transaction boundaries");
-    let atomic = seamark::atomic_http::router(
-        Arc::clone(&registry),
-        database,
-        Arc::new(FixtureAtomicGuard),
-        Arc::new(FixtureAtomicHandler { store, registry }),
-    );
+    let api = ApiBuilder::new(Arc::clone(&registry), authorization.clone())
+        .queries(
+            adapter,
+            PaginationConfig::new(1, 100, Some(100), Some(100))
+                .expect("pagination settings are valid"),
+        )
+        .mutations(Arc::new(StoreMutationAdapter(Arc::clone(&store))))
+        .atomic_operations(
+            database,
+            authorization,
+            Arc::new(FixtureAtomicHandler { store, registry }),
+        )
+        .limits(ExecutionLimits::new().max_atomic_operations(100))
+        .try_build()
+        .expect("Seamark API configuration is valid");
     let app = Router::new()
-        .nest("/api", api.merge(atomic))
+        .nest("/api", api)
         .route("/", get(|| async { "ok" }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:5556")
         .await
