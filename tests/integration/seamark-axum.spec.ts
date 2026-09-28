@@ -229,11 +229,9 @@ describe('Seamark Axum integration tests', () => {
     expect(persistedPerson.firstName).toBe('Alice')
     expect(persistedPerson.lastName).toBe('Smith')
 
-    const { record: persistedArticle } = await articlesApi.findRecord<Article>(
-      'articles',
-      createdArticle.id,
-      { include: ['author'] },
-    )
+    const { record: persistedArticle } = await articlesApi.findRecord<Article>('articles', createdArticle.id, {
+      include: ['author'],
+    })
     expect(persistedArticle.title).toBe('Atomic Operations Test')
     expect(persistedArticle.author?.id).toBe(createdPerson.id)
   })
