@@ -1952,9 +1952,9 @@ dependencies = [
 
 [[package]]
 name = "seamark"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1a45f33f28f5c127fb80f3a8e4b0b509537d0f7a67f2026650f49ac1f40bfa4"
+checksum = "7cc335a40d131dc33fbafb7d071921d49e8f42cc16b7bc104f9e1a78273e3e5b"
 dependencies = [
  "async-trait",
  "axum",

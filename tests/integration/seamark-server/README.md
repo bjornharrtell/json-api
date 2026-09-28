@@ -2,7 +2,7 @@
 
 This fixture exercises the TypeScript JSON:API client against an Axum server
 built with Seamark's standard SeaORM query and mutation adapters and API
-builder. Its Seamark dependency uses the published crates.io release `0.2.0`
+builder. Its Seamark dependency uses the published crates.io release `0.3.0`
 for reproducible builds.
 
 Run it from the `json-api` repository root with:
