@@ -7,6 +7,5 @@ edition = "2024"
 async-trait = "0.1"
 axum = "0.8"
 seamark = { version = "0.2.0", features = ["sqlite"] }
-sea-orm = { version = "2.0.4", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
-serde_json = "1"
+sea-orm = { version = "2.0.4", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-sqlite"] }
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread"] }

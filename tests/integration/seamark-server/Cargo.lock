@@ -1976,7 +1976,6 @@ dependencies = [
  "axum",
  "sea-orm",
  "seamark",
- "serde_json",
  "tokio",
 ]
 

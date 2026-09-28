@@ -220,13 +220,22 @@ describe('Seamark Axum integration tests', () => {
     expect(result?.records.length).toBe(2)
 
     const createdPerson = result?.records[0] as Person
-    expect(createdPerson.firstName).toBe('Alice')
-    expect(createdPerson.lastName).toBe('Smith')
     expect(createdPerson.id).toBeDefined()
 
     const createdArticle = result?.records[1] as Article
-    expect(createdArticle.title).toBe('Atomic Operations Test')
     expect(createdArticle.id).toBeDefined()
+
+    const { record: persistedPerson } = await articlesApi.findRecord<Person>('people', createdPerson.id)
+    expect(persistedPerson.firstName).toBe('Alice')
+    expect(persistedPerson.lastName).toBe('Smith')
+
+    const { record: persistedArticle } = await articlesApi.findRecord<Article>(
+      'articles',
+      createdArticle.id,
+      { include: ['author'] },
+    )
+    expect(persistedArticle.title).toBe('Atomic Operations Test')
+    expect(persistedArticle.author?.id).toBe(createdPerson.id)
   })
 
   test('atomic operations - create article with existing author', async () => {
@@ -246,8 +255,13 @@ describe('Seamark Axum integration tests', () => {
     expect(result?.records.length).toBe(1)
 
     const createdArticle = result?.records[0] as Article
-    expect(createdArticle.title).toBe('Another Atomic Article')
     expect(createdArticle.id).toBeDefined()
+
+    const { record: persistedArticle } = await articlesApi.findRecord<Article>('articles', createdArticle.id, {
+      include: ['author'],
+    })
+    expect(persistedArticle.title).toBe('Another Atomic Article')
+    expect(persistedArticle.author?.id).toBe('1')
   })
 
   test('atomic operations - update article', async () => {
