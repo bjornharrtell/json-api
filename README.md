@@ -107,6 +107,8 @@ Successful responses that require a JSON:API document must contain valid JSON. I
 
 `preserveNullRelationships: true` in `useJsonApi` assigns an explicit `data: null` to-one relationship as `null` on the normalized record. By default, null relationships remain unset. Links-only relationships (which omit `data`) remain unset.
 
+By default, relationship linkage is only decoded when it can be resolved from the response's `included` resources (or from the primary data); unresolved identifiers and, when the response has no `included` member, empty to-many relationships are left unset. `preserveRelationshipLinkage: true` assigns every `data` linkage: identifiers that cannot be resolved become stub records containing only `type` and `id` (or `lid`), shared per identifier, and empty to-many relationships become `[]`. Be aware that saving such a record serializes this linkage, which replaces the to-many relationships on the server. Resources and identifiers that use a local `lid` are resolved by `lid` in either mode. `findRecord` throws when the response has `data: null`.
+
 `JsonApiWireDocument`, `JsonApiWireResource`, `JsonApiWireRelationship`, and related `JsonApiWire*` types describe incoming JSON:API payloads, including optional members, `data: null`, and links-only relationships. The existing `JsonApiDocument` and `JsonApiResource` types remain available unchanged for compatibility.
 
 ## Development

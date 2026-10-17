@@ -205,6 +205,14 @@ export interface JsonApiConfig {
    * Defaults to false to retain the legacy behavior of leaving them unset.
    */
   preserveNullRelationships?: boolean
+  /**
+   * Preserve relationship linkage even when it cannot be resolved from the response's `included`
+   * resources: identifiers become stub records (`{ id, type }` or `{ id: '', lid, type }`) and empty
+   * to-many relationships become `[]`, including when the response has no `included` member.
+   * Defaults to false to retain the legacy behavior of leaving such relationships unset, which keeps
+   * them out of the payload when a fetched record is saved again.
+   */
+  preserveRelationshipLinkage?: boolean
 }
 
 export enum RelationshipType {
@@ -306,36 +314,56 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
 
   function resourcesToRecords(resources: JsonApiWireResource[], included?: JsonApiWireResource[]): BaseEntity[] {
     function resourceToRecord(resource: JsonApiWireResource): BaseEntity {
-      const record = createRecord(resource.type, {
-        id: resource.id,
-        ...resource.attributes,
-      })
+      const properties: Partial<BaseEntity> & { id?: string } = {
+        // A resource identified only by a local id has no server id; avoid generating one
+        id: resource.id ?? (resource.lid === undefined ? undefined : ''),
+      }
+      if (resource.lid !== undefined) properties.lid = resource.lid
+      const record = createRecord(resource.type, { ...properties, ...resource.attributes })
       if (resource.meta) record[META] = resource.meta
       return record
     }
 
-    function setRecord(map: Map<string, Map<string, BaseEntity>>, record: BaseEntity) {
+    type RecordMap = Map<string, Map<string, BaseEntity>>
+
+    function setRecord(map: RecordMap, record: BaseEntity) {
       if (!map.has(record.type)) map.set(record.type, new Map())
-      map.get(record.type)?.set(record.id, record)
+      const byKey = map.get(record.type)
+      if (record.id) byKey?.set(`id:${record.id}`, record)
+      if (record.lid !== undefined) byKey?.set(`lid:${record.lid}`, record)
     }
 
-    function getRecord(map: Map<string, Map<string, BaseEntity>>, rid: JsonApiResourceIdentifier) {
-      if (rid.id === undefined) throw new Error('Resource identifier must have an id')
-      if (!map.has(rid.type)) map.set(rid.type, new Map())
-      return map.get(rid.type)?.get(rid.id)
+    function getRecord(map: RecordMap, rid: JsonApiResourceIdentifier) {
+      let key: string
+      if (rid.id !== undefined) key = `id:${rid.id}`
+      else if (rid.lid !== undefined) key = `lid:${rid.lid}`
+      else throw new Error('Resource identifier must have an id or lid')
+      return map.get(rid.type)?.get(key)
     }
 
-    const includedMap = new Map<string, Map<string, BaseEntity>>()
-    if (included) for (const resource of included) setRecord(includedMap, resourceToRecord(resource))
+    const includedMap: RecordMap = new Map()
+    const includedRecords = included?.map(resourceToRecord) ?? []
+    for (const record of includedRecords) setRecord(includedMap, record)
 
     const records = resources.map(resourceToRecord)
-    const recordsMap = new Map<string, Map<string, BaseEntity>>()
+    const recordsMap: RecordMap = new Map()
     for (const record of records) setRecord(recordsMap, record)
 
-    function populateRelationships(resource: JsonApiWireResource, nullRelationshipsOnly = false) {
-      const record = getRecord(recordsMap, resource) ?? getRecord(includedMap, resource)
-      if (!record) throw new Error('Unexpected not found record')
+    // Identifiers that resolve to neither a primary nor an included resource become stub records
+    const unresolvedMap: RecordMap = new Map()
 
+    function resolveRecord(rid: JsonApiResourceIdentifier) {
+      const resolved = getRecord(includedMap, rid) || getRecord(recordsMap, rid)
+      if (resolved || !config.preserveRelationshipLinkage) return resolved
+      let stub = getRecord(unresolvedMap, rid)
+      if (!stub) {
+        stub = createRecord(rid.type, rid.lid === undefined ? { id: rid.id } : { id: rid.id ?? '', lid: rid.lid })
+        setRecord(unresolvedMap, stub)
+      }
+      return stub
+    }
+
+    function populateRelationships(resource: JsonApiWireResource, record: BaseEntity, nullRelationshipsOnly = false) {
       if (!resource.relationships) return
 
       const rels = relationshipDefinitions.get(resource.type)
@@ -357,7 +385,7 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
             : [reldoc.data as JsonApiResourceIdentifier]
         const relatedRecords = rids
           .filter((d) => d?.type === rel.type)
-          .map((d) => getRecord(includedMap, d) || getRecord(recordsMap, d))
+          .map(resolveRecord)
           .filter(Boolean)
         setRelationship(
           record,
@@ -367,11 +395,12 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       }
     }
 
-    if (included) {
-      for (const r of resources) populateRelationships(r)
-      for (const r of included) populateRelationships(r)
+    if (included || config.preserveRelationshipLinkage) {
+      for (const [index, resource] of resources.entries()) populateRelationships(resource, records[index])
+      for (const [index, resource] of (included ?? []).entries())
+        populateRelationships(resource, includedRecords[index])
     } else if (config.preserveNullRelationships) {
-      for (const r of resources) populateRelationships(r, true)
+      for (const [index, resource] of resources.entries()) populateRelationships(resource, records[index], true)
     }
 
     return records
@@ -395,9 +424,9 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     params?: FetchParams,
   ): Promise<{ doc: JsonApiDocument; record: T }> {
     const doc = await _fetcher.fetchDocument(type, id, options, params)
-    const resource = doc.data as JsonApiResource
-    const records = resourcesToRecords([resource], doc.included) as T[]
-    const record = records[0]
+    const resource = doc.data as JsonApiResource | null | undefined
+    if (!resource) throw new Error(`Record with id ${id} not found`)
+    const record = resourcesToRecords([resource], doc.included)[0] as T | undefined
     if (!record) throw new Error(`Record with id ${id} not found`)
     return { doc, record }
   }
