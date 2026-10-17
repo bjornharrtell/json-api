@@ -205,14 +205,6 @@ export interface JsonApiConfig {
    * Defaults to false to retain the legacy behavior of leaving them unset.
    */
   preserveNullRelationships?: boolean
-  /**
-   * Preserve relationship linkage even when it cannot be resolved from the response's `included`
-   * resources: identifiers become stub records (`{ id, type }` or `{ id: '', lid, type }`) and empty
-   * to-many relationships become `[]`, including when the response has no `included` member.
-   * Defaults to false to retain the legacy behavior of leaving such relationships unset, which keeps
-   * them out of the payload when a fetched record is saved again.
-   */
-  preserveRelationshipLinkage?: boolean
 }
 
 export enum RelationshipType {
@@ -349,18 +341,8 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
     const recordsMap: RecordMap = new Map()
     for (const record of records) setRecord(recordsMap, record)
 
-    // Identifiers that resolve to neither a primary nor an included resource become stub records
-    const unresolvedMap: RecordMap = new Map()
-
     function resolveRecord(rid: JsonApiResourceIdentifier) {
-      const resolved = getRecord(includedMap, rid) || getRecord(recordsMap, rid)
-      if (resolved || !config.preserveRelationshipLinkage) return resolved
-      let stub = getRecord(unresolvedMap, rid)
-      if (!stub) {
-        stub = createRecord(rid.type, rid.lid === undefined ? { id: rid.id } : { id: rid.id ?? '', lid: rid.lid })
-        setRecord(unresolvedMap, stub)
-      }
-      return stub
+      return getRecord(includedMap, rid) || getRecord(recordsMap, rid)
     }
 
     function populateRelationships(resource: JsonApiWireResource, record: BaseEntity, nullRelationshipsOnly = false) {
@@ -395,10 +377,9 @@ export function useJsonApi(config: JsonApiConfig, fetcher?: JsonApiFetcher) {
       }
     }
 
-    if (included || config.preserveRelationshipLinkage) {
+    if (included) {
       for (const [index, resource] of resources.entries()) populateRelationships(resource, records[index])
-      for (const [index, resource] of (included ?? []).entries())
-        populateRelationships(resource, includedRecords[index])
+      for (const [index, resource] of included.entries()) populateRelationships(resource, includedRecords[index])
     } else if (config.preserveNullRelationships) {
       for (const [index, resource] of resources.entries()) populateRelationships(resource, records[index], true)
     }

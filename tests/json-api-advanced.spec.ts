@@ -1047,7 +1047,7 @@ describe('JsonApi resource meta', () => {
     expect(record.author?.[META]).toEqual({ role: 'editor' })
   })
 
-  describe('relationship linkage decoding', () => {
+  describe('local identifiers and null primary data', () => {
     interface Article extends BaseEntity {
       title?: string
       author?: BaseEntity & { name?: string }
@@ -1069,120 +1069,30 @@ describe('JsonApi resource meta', () => {
         { type: 'comments' },
       ],
     }
-    const apiFor = (doc: JsonApiDocument, preserveRelationshipLinkage = true) =>
-      useJsonApi({ ...relationshipsConfig, preserveRelationshipLinkage }, {
-        fetchDocument: async () => doc,
-      } as unknown as JsonApiFetcher)
-
-    test('leaves unresolved linkage unset by default', async () => {
-      const doc: JsonApiDocument = {
-        data: {
-          id: '1',
-          type: 'articles',
-          attributes: {},
-          relationships: {
-            author: { data: { type: 'people', id: '9' } },
-            comments: { data: [] },
-          },
-        },
-      }
-      const { record } = await apiFor(doc, false).findRecord<Article>('articles', '1')
-      expect(record.author).toBeUndefined()
-      expect(record.comments).toBeUndefined()
-      const withIncluded = await apiFor({ ...doc, included: [] }, false).findRecord<Article>('articles', '1')
-      expect(withIncluded.record.author).toBeUndefined()
-      expect(withIncluded.record.comments).toEqual([])
-    })
-
-    test('empty to-many linkage without included resources is an empty array', async () => {
-      const api = apiFor({
-        data: {
-          id: '1',
-          type: 'articles',
-          attributes: {},
-          relationships: { comments: { data: [] } },
-        },
-      })
-      const { record } = await api.findRecord<Article>('articles', '1')
-      expect(record.comments).toEqual([])
-    })
-
-    test('unresolved identifiers become stub records without included resources', async () => {
-      const api = apiFor({
-        data: {
-          id: '1',
-          type: 'articles',
-          attributes: {},
-          relationships: {
-            author: { data: { type: 'people', id: '9' } },
-            comments: { data: [{ type: 'comments', id: '5' }] },
-          },
-        },
-      })
-      const { record } = await api.findRecord<Article>('articles', '1')
-      expect(record.author).toEqual({ type: 'people', id: '9' })
-      expect(record.comments).toEqual([{ type: 'comments', id: '5' }])
-    })
-
-    test('unresolved identifiers become shared stub records when other resources are included', async () => {
-      const api = apiFor({
-        data: {
-          id: '1',
-          type: 'articles',
-          attributes: {},
-          relationships: {
-            author: { data: { type: 'people', id: '9' } },
-            other: { data: { type: 'people', id: '9' } },
-            comments: { data: [{ type: 'comments', id: '5' }] },
-          },
-        },
-        included: [{ id: '5', type: 'comments', attributes: { body: 'Hi' } }],
-      })
-      const { record } = await api.findRecord<Article>('articles', '1')
-      expect(record.author).toEqual({ type: 'people', id: '9' })
-      expect(record.author).toBe(record.other)
-      expect(record.comments).toEqual([{ type: 'comments', id: '5', body: 'Hi' }])
-    })
+    const apiFor = (doc: JsonApiDocument) =>
+      useJsonApi(relationshipsConfig, { fetchDocument: async () => doc } as unknown as JsonApiFetcher)
 
     test('resolves local identifier linkage to included resources', async () => {
-      const api = apiFor(
-        {
-          data: [
-            {
-              lid: 'article',
-              type: 'articles',
-              attributes: {},
-              relationships: {
-                author: { data: { type: 'people', lid: 'person' } },
-                other: { data: { type: 'people', id: '1' } },
-              },
+      const api = apiFor({
+        data: [
+          {
+            lid: 'article',
+            type: 'articles',
+            attributes: {},
+            relationships: {
+              author: { data: { type: 'people', lid: 'person' } },
+              other: { data: { type: 'people', id: '1' } },
             },
-          ],
-          included: [{ id: '1', lid: 'person', type: 'people', attributes: { name: 'Ada' } }],
-        },
-        false,
-      )
+          },
+        ],
+        included: [{ id: '1', lid: 'person', type: 'people', attributes: { name: 'Ada' } }],
+      })
       const { records } = await api.findAll<Article>('articles')
       const [article] = records
       expect(article.lid).toBe('article')
       expect(article.id).toBe('')
       expect(article.author?.name).toBe('Ada')
       expect(article.author).toBe(article.other)
-    })
-
-    test('creates stub records for unresolved local identifiers', async () => {
-      const api = apiFor({
-        data: [
-          {
-            id: '1',
-            type: 'articles',
-            attributes: {},
-            relationships: { author: { data: { type: 'people', lid: 'person' } } },
-          },
-        ],
-      })
-      const { records } = await api.findAll<Article>('articles')
-      expect(records[0].author).toEqual({ type: 'people', id: '', lid: 'person' })
     })
 
     test('findRecord rejects a null primary document', async () => {
