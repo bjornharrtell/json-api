@@ -1046,4 +1046,58 @@ describe('JsonApi resource meta', () => {
     expect(record[META]).toEqual({ copyright: 'MIT License' })
     expect(record.author?.[META]).toEqual({ role: 'editor' })
   })
+
+  describe('local identifiers and null primary data', () => {
+    interface Article extends BaseEntity {
+      title?: string
+      author?: BaseEntity & { name?: string }
+      other?: BaseEntity & { name?: string }
+      comments?: BaseEntity[]
+    }
+    const relationshipsConfig: JsonApiConfig = {
+      endpoint: 'https://api.example.com',
+      modelDefinitions: [
+        {
+          type: 'articles',
+          relationships: {
+            author: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+            other: { type: 'people', relationshipType: RelationshipType.BelongsTo },
+            comments: { type: 'comments', relationshipType: RelationshipType.HasMany },
+          },
+        },
+        { type: 'people' },
+        { type: 'comments' },
+      ],
+    }
+    const apiFor = (doc: JsonApiDocument) =>
+      useJsonApi(relationshipsConfig, { fetchDocument: async () => doc } as unknown as JsonApiFetcher)
+
+    test('resolves local identifier linkage to included resources', async () => {
+      const api = apiFor({
+        data: [
+          {
+            lid: 'article',
+            type: 'articles',
+            attributes: {},
+            relationships: {
+              author: { data: { type: 'people', lid: 'person' } },
+              other: { data: { type: 'people', id: '1' } },
+            },
+          },
+        ],
+        included: [{ id: '1', lid: 'person', type: 'people', attributes: { name: 'Ada' } }],
+      })
+      const { records } = await api.findAll<Article>('articles')
+      const [article] = records
+      expect(article.lid).toBe('article')
+      expect(article.id).toBe('')
+      expect(article.author?.name).toBe('Ada')
+      expect(article.author).toBe(article.other)
+    })
+
+    test('findRecord rejects a null primary document', async () => {
+      const api = apiFor({ data: null } as unknown as JsonApiDocument)
+      await expect(api.findRecord('articles', '1')).rejects.toThrow('Record with id 1 not found')
+    })
+  })
 })

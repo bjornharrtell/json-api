@@ -107,6 +107,8 @@ Successful responses that require a JSON:API document must contain valid JSON. I
 
 `preserveNullRelationships: true` in `useJsonApi` assigns an explicit `data: null` to-one relationship as `null` on the normalized record. By default, null relationships remain unset. Links-only relationships (which omit `data`) remain unset.
 
+Resources and identifiers that use a local `lid` are resolved by `lid`. `findRecord` throws when the response has `data: null`.
+
 `JsonApiWireDocument`, `JsonApiWireResource`, `JsonApiWireRelationship`, and related `JsonApiWire*` types describe incoming JSON:API payloads, including optional members, `data: null`, and links-only relationships. The existing `JsonApiDocument` and `JsonApiResource` types remain available unchanged for compatibility.
 
 ## Development
